@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Curious</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="brand-lockup">
+          <h1>Curious</h1>
+          <p class="tagline">No spiraling. Stay curious.</p>
+        </div>
+      </header>
+
+      <nav class="tab-bar" aria-label="Primary">
+        <button class="tab-button is-active" data-tab="checkin" type="button">
+          Check In
+        </button>
+        <button class="tab-button" data-tab="threads" type="button">
+          Threads
+        </button>
+      </nav>
+
+      <main>
+        <section class="tab-panel is-active" data-panel="checkin">
+          <div class="card" id="checkin-card"></div>
+        </section>
+
+        <section class="tab-panel" data-panel="threads">
+          <div class="card">
+            <div class="threads-copy">
+              <p class="eyebrow">Threads</p>
+              <h2>What keeps asking for care</h2>
+              <p class="muted">
+                A gentle glance at what has been showing up.
+              </p>
+            </div>
+            <div id="threads-content" class="threads-grid"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
