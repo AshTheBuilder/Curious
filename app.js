@@ -32,68 +32,57 @@ const AFFIRMATIONS = [
   },
 ];
 
-const PROMPT_VARIANTS = {
-  firstReflection: [
-    "What’s going on here?",
-    "What am I feeling right now?",
-    "What feels off right now?",
+const FLOW_VARIANTS = {
+  validationOne: [
+    "That makes sense to me",
+    "I can see why that would feel this way to me",
+    "Of course that would bother me",
+    "That makes a lot of sense to me",
+    "I understand why that feels important to me",
+    "It makes sense that this is coming up for me",
+    "I’m really glad I noticed that",
   ],
-  situationGoingOn: [
-    "What’s going on here?",
-    "What happened here?",
-    "What am I reacting to?",
+  validationOneLight: ["Heard", "I hear that", "I see that"],
+  deeperPrompt: [
+    "What about that feels the hardest?",
+    "What about that is bothering me the most?",
+    "What about that doesn’t sit right with me?",
+    "What about that feels most real to me right now?",
   ],
-  situationBothering: [
-    "Why is this bothering me?",
-    "What about this is getting to me?",
-    "What feels hard about this?",
+  deeperPromptLight: ["What about that?", "What feels off about that?", "What’s going on there?"],
+  validationTwo: [
+    "That makes sense to me too",
+    "I can see why that would feel true to me",
+    "Of course that would feel this way to me",
+    "That feels really real to me right now",
+    "I understand why that would land that way for me",
+    "That makes a lot of sense from where I am",
+    "I’m really glad I noticed that",
   ],
-  situationPerspective: [
-    "Is there another way I can see this?",
-    "What else might be true here?",
-    "What am I missing right now?",
+  grounding: [
+    "I’m here with this",
+    "I don’t need to push this away",
+    "I can stay with this for a second",
+    "This can be here, and I’m still okay",
+    "I’m noticing this, not becoming it",
   ],
-};
-
-const PART_VALIDATION_VARIANTS = {
-  default: [
-    "I hear you. That makes sense.",
-    "That makes sense. I hear you.",
-    "I hear you. I get it.",
-    "I hear you. I understand.",
-    "I can see why this is here.",
-    "I can see why you feel this way.",
-    "I can see this.",
-    "I hear what you’re saying.",
-    "I’m with you in this.",
-    "I hear you. This makes sense to me.",
-    "I’m here. I hear you.",
+  perspectivePrompt: [
+    "Is this the whole picture, or just part of it?",
+    "Is there anything in me that feels different?",
+    "What do I think about this from a steadier place?",
+    "Is there another side to this at all?",
   ],
-  quiet: [
-    "I’m here with you. You don’t have to say anything yet.",
-    "I’m here. You can take your time.",
-    "I’m right here. It’s okay if nothing’s coming up yet.",
+  closing: [
+    "I see this a little more clearly",
+    "I’m glad I checked in",
+    "That helped",
+    "I can come back to this anytime",
+    "I don’t have to figure it all out right now",
   ],
-  anger: [
-    "I hear you. That makes sense.",
-    "I hear you. Of course this is coming up.",
-    "Of course. I hear you.",
-    "I’m here. I hear you.",
-  ],
-  hurt: [
-    "I hear you. I understand.",
-    "I can see why you feel this way.",
-    "I can see why this is here.",
-    "I’m sorry. I hear you.",
-    "I’m sorry. I understand.",
-    "I’m sorry you’re feeling this. I hear you.",
-    "I’m with you in this.",
-  ],
-  overwhelm: [
-    "I hear you. That makes sense.",
-    "I hear you. This feels like a lot.",
-    "I hear you. This makes sense to me.",
-    "I’m here. I hear you.",
+  lightExit: [
+    "That’s all I have right now, and that’s okay",
+    "I can just sit with this",
+    "I don’t have to go deeper right now",
   ],
 };
 
@@ -117,31 +106,57 @@ renderThreads();
 
 function createEmptyEntry() {
   return {
-    firstReflection: "",
-    branch: "",
-    partMessage: "",
-    partHasMessage: false,
-    partValidationText: "",
-    situationGoingOn: "",
-    situationBothering: "",
-    situationPerspective: "",
-    situationClearer: "",
+    openingReflection: "",
+    mainConcern: "",
+    deeperReflection: "",
+    perspectiveReflection: "",
+    lightMode: false,
+    lightExitChoice: "",
+    loopCount: 0,
     closingAffirmation: "",
     extractedKeywords: [],
   };
 }
 
-function createPromptCopy() {
+function createPromptCopy(previous = {}) {
+  const validationOne = chooseVariant(FLOW_VARIANTS.validationOne, previous.validationOne);
+  const validationTwo = chooseVariant(
+    FLOW_VARIANTS.validationTwo.filter((option) => option !== validationOne),
+    previous.validationTwo
+  );
+  const lightExitOptions = chooseMultipleVariants(FLOW_VARIANTS.lightExit, 3, previous.lightExitOptions);
+
   return {
-    firstReflection: chooseVariant(PROMPT_VARIANTS.firstReflection),
-    situationGoingOn: chooseVariant(PROMPT_VARIANTS.situationGoingOn),
-    situationBothering: chooseVariant(PROMPT_VARIANTS.situationBothering),
-    situationPerspective: chooseVariant(PROMPT_VARIANTS.situationPerspective),
+    validationOne,
+    validationOneLight: chooseVariant(FLOW_VARIANTS.validationOneLight, previous.validationOneLight),
+    deeperPrompt: chooseVariant(FLOW_VARIANTS.deeperPrompt, previous.deeperPrompt),
+    deeperPromptLight: chooseVariant(FLOW_VARIANTS.deeperPromptLight, previous.deeperPromptLight),
+    validationTwo,
+    grounding: chooseVariant(FLOW_VARIANTS.grounding, previous.grounding),
+    perspectivePrompt: chooseVariant(FLOW_VARIANTS.perspectivePrompt, previous.perspectivePrompt),
+    closing: chooseVariant(FLOW_VARIANTS.closing, previous.closing),
+    lightExit: lightExitOptions[0],
+    lightExitOptions,
   };
 }
 
-function chooseVariant(options) {
-  return options[Math.floor(Math.random() * options.length)];
+function chooseVariant(options, previous = "") {
+  if (options.length === 1) {
+    return options[0];
+  }
+
+  const available = options.filter((option) => option !== previous);
+  const pool = available.length ? available : options;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function chooseMultipleVariants(options, count, previous = []) {
+  const previousSet = new Set(previous);
+  const prioritized = options
+    .filter((option) => !previousSet.has(option))
+    .concat(options.filter((option) => previousSet.has(option)));
+
+  return prioritized.slice(0, Math.min(count, options.length));
 }
 
 function setActiveTab(tabName) {
@@ -168,145 +183,111 @@ function renderCheckIn() {
     case "intro":
       renderMessageScreen({
         label: "CHECK IN",
-        main: "Something is here.",
-        subtext: "I want to understand it.",
-        buttonText: "Continue",
+        main: "Something feels off",
+        buttonText: "Let me pause for a second",
         onContinue: () => setScreen("first-reflection"),
       });
       break;
     case "first-reflection":
       renderInputScreen({
         label: "CHECK IN",
-        main: state.promptCopy.firstReflection,
-        value: state.entry.firstReflection,
+        main: "I’m checking in",
+        subtext: "What’s going on with me?",
+        value: state.entry.openingReflection,
         onSubmit: (value) => {
-          state.entry.firstReflection = value.trim();
-          setScreen("first-pause");
+          state.entry.openingReflection = value.trim();
+          setScreen("second-reflection");
         },
       });
       break;
-    case "first-pause":
-      renderMessageScreen({
+    case "second-reflection":
+      renderInputScreen({
         label: "CHECK IN",
-        main: "I’m noticing this.",
-        buttonText: "Continue",
-        onContinue: () => setScreen("branch"),
-        includePulse: true,
+        main: "What’s really getting to me?",
+        value: state.entry.mainConcern,
+        onSubmit: (value) => {
+          state.entry.mainConcern = value.trim();
+          state.entry.lightMode = state.entry.mainConcern.length < 25;
+          setScreen("validation-one");
+        },
       });
       break;
-    case "branch":
-      renderBranchScreen();
-      break;
-    case "part-open":
-      renderSilentPresenceStep({
-        screen: "part-open",
-        main: "I’m going to get still and listen for the part that’s here.",
-        buttonLabel: "Continue",
-        onContinue: () => setScreen("part-message"),
-        delayMs: 2600,
+    case "validation-one":
+      renderDelayedContinueScreen({
+        screen: "validation-one",
+        main: state.entry.lightMode ? state.promptCopy.validationOneLight : state.promptCopy.validationOne,
+        buttonLabel: "Keep going",
+        onContinue: () => setScreen("third-reflection"),
       });
       break;
-    case "part-message":
-      renderPartMessageScreen();
-      break;
-    case "part-more":
-      renderPartMoreScreen();
-      break;
-    case "part-validate":
-      renderMessageScreen({
+    case "third-reflection":
+      renderInputScreen({
         label: "CHECK IN",
-        main: state.entry.partValidationText,
-        buttonText: "Continue",
-        onContinue: () => setScreen("part-settled"),
+        main: state.entry.lightMode ? state.promptCopy.deeperPromptLight : state.promptCopy.deeperPrompt,
+        value: state.entry.deeperReflection,
+        onSubmit: (value) => {
+          state.entry.deeperReflection = value.trim();
+          if (state.entry.lightMode && state.entry.deeperReflection.length < 25) {
+            setScreen("light-exit");
+            return;
+          }
+
+          setScreen("validation-two");
+        },
       });
       break;
-    case "part-settled":
+    case "light-exit":
+      renderChoiceScreen({
+        label: "CHECK IN",
+        main: state.promptCopy.lightExit,
+        choices: state.promptCopy.lightExitOptions,
+        onChoose: (choice) => {
+          state.entry.lightExitChoice = choice;
+          setScreen("grounding");
+        },
+      });
+      break;
+    case "validation-two":
+      renderDelayedContinueScreen({
+        screen: "validation-two",
+        main: state.promptCopy.validationTwo,
+        buttonLabel: "Keep going",
+        onContinue: () => setScreen("grounding"),
+      });
+      break;
+    case "grounding":
+      renderDelayedContinueScreen({
+        screen: "grounding",
+        main: state.promptCopy.grounding,
+        buttonLabel: "Keep going",
+        onContinue: () => setScreen("perspective"),
+      });
+      break;
+    case "perspective":
+      renderInputScreen({
+        label: "CHECK IN",
+        main: state.promptCopy.perspectivePrompt,
+        value: state.entry.perspectiveReflection,
+        onSubmit: (value) => {
+          state.entry.perspectiveReflection = value.trim();
+          setScreen("clearer");
+        },
+      });
+      break;
+    case "clearer":
       renderLandingScreen({
         label: "CHECK IN",
-        main: "Does this feel more settled, or is there more you want me to hear?",
-        primaryLabel: "More settled",
+        main: "Does this feel a little clearer, or is there more here?",
+        primaryLabel: "This feels clearer",
         secondaryLabel: "There’s more",
-        onPrimary: () => finishCheckIn("part-closing"),
-        onSecondary: () => setScreen("part-more"),
-      });
-      break;
-    case "part-closing":
-      renderClosing({
-        main: "I stayed with this.",
-        subtext: "I can come back anytime.",
-      });
-      break;
-    case "situation-going-on":
-      renderInputScreen({
-        label: "CHECK IN",
-        main: state.promptCopy.situationGoingOn,
-        value: state.entry.situationGoingOn,
-        onSubmit: (value) => {
-          state.entry.situationGoingOn = value.trim();
-          setScreen("situation-bothering");
-        },
-      });
-      break;
-    case "situation-bothering":
-      renderInputScreen({
-        label: "CHECK IN",
-        main: state.promptCopy.situationBothering,
-        value: state.entry.situationBothering,
-        onSubmit: (value) => {
-          state.entry.situationBothering = value.trim();
-          setScreen("situation-validation");
-        },
-      });
-      break;
-    case "situation-validation":
-      renderMessageScreen({
-        label: "CHECK IN",
-        main: "That makes sense to me.",
-        buttonText: "Continue",
-        onContinue: () => setScreen("situation-perspective"),
-        includePulse: true,
-      });
-      break;
-    case "situation-perspective":
-      renderInputScreen({
-        label: "CHECK IN",
-        main: state.promptCopy.situationPerspective,
-        value: state.entry.situationPerspective,
-        onSubmit: (value) => {
-          state.entry.situationPerspective = value.trim();
-          setScreen("situation-validation-2");
-        },
-      });
-      break;
-    case "situation-validation-2":
-      renderMessageScreen({
-        label: "CHECK IN",
-        main: "There’s a reason this hit me.",
-        subtext: "I’m seeing a little more of it.",
-        buttonText: "Continue",
-        onContinue: () => setScreen("situation-clearer"),
-      });
-      break;
-    case "situation-clearer":
-      renderLandingScreen({
-        label: "CHECK IN",
-        main: "Does this feel a little clearer now?",
-        primaryLabel: "Yes, it does",
-        secondaryLabel: "There’s more to say",
-        onPrimary: () => finishCheckIn("situation-closing"),
-        onSecondary: () => setScreen("situation-going-on"),
-      });
-      break;
-    case "situation-closing":
-      renderClosing({
-        main: "I see it more clearly.",
-        subtext: "I’m glad I checked in. I can come back if this shows up again.",
+        onPrimary: () => finishCheckIn("closing"),
+        onSecondary: loopCheckIn,
       });
       break;
     case "closing":
       renderClosing({
-        main: "I’m here with myself.",
-        subtext: "I can come back anytime.",
+        main: state.promptCopy.closing,
+        buttonText: "Back to start",
       });
       break;
     default:
@@ -359,13 +340,30 @@ function renderMessageScreen({
   document.querySelector("#continue-button").addEventListener("click", onContinue);
 }
 
+function renderDelayedContinueScreen({
+  screen,
+  main,
+  subtext = "",
+  buttonLabel,
+  onContinue,
+  delayMs = getPulseDelay(),
+}) {
+  renderSilentPresenceStep({
+    screen,
+    main,
+    buttonLabel,
+    onContinue,
+    delayMs,
+  });
+}
+
 function renderInputScreen({
   label,
   main,
   subtext = "",
   value,
   onSubmit,
-  placeholder = "I can start anywhere.",
+  placeholder = "",
 }) {
   checkinCard.innerHTML = `
     <form id="prompt-form">
@@ -392,6 +390,33 @@ function renderInputScreen({
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     onSubmit(input.value);
+  });
+}
+
+function renderChoiceScreen({ label, main, choices, onChoose }) {
+  checkinCard.innerHTML = `
+    <div class="support-copy">
+      <p class="eyebrow">${escapeHtml(label)}</p>
+      <h2>${escapeHtml(main)}</h2>
+      <div class="choice-group">
+        ${choices
+          .map(
+            (choice, index) => `
+              <button class="button button-secondary" type="button" data-choice-index="${index}">
+                ${escapeHtml(choice)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-choice-index]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const choice = choices[Number(button.dataset.choiceIndex)];
+      onChoose(choice);
+    });
   });
 }
 
@@ -481,34 +506,6 @@ function renderPauseScreen({
   }
 }
 
-function renderBranchScreen() {
-  checkinCard.innerHTML = `
-    <div class="support-copy">
-      <p class="eyebrow">CHECK IN</p>
-      <h2>What kind of thing is this?</h2>
-      <p class="muted support-line">I can go with what fits best.</p>
-      <div class="choice-group">
-        <button class="button button-secondary" type="button" id="part-branch">
-          A part of me is reacting
-        </button>
-        <button class="button button-secondary" type="button" id="situation-branch">
-          I’m trying to understand a situation
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.querySelector("#part-branch").addEventListener("click", () => {
-    state.entry.branch = "part";
-    setScreen("part-open");
-  });
-
-  document.querySelector("#situation-branch").addEventListener("click", () => {
-    state.entry.branch = "situation";
-    setScreen("situation-going-on");
-  });
-}
-
 function renderPresenceStep({ screen, main, reveal, buttonLabel, onContinue, delayMs = 2400 }) {
   if (!state.delayedRevealReady) {
     scheduleReveal(screen, delayMs);
@@ -564,67 +561,6 @@ function renderSilentPresenceStep({ screen, main, buttonLabel, onContinue, delay
   }
 }
 
-function renderPartMessageScreen() {
-  checkinCard.innerHTML = `
-    <form id="part-message-form">
-      <div class="question">
-        <p class="eyebrow">CHECK IN</p>
-        <h2>What is this part trying to tell me?</h2>
-      </div>
-      <textarea
-        id="part-message-input"
-        class="text-input"
-        placeholder="I’m listening."
-      >${escapeHtml(state.entry.partMessage)}</textarea>
-      <div class="actions">
-        <button class="button button-primary" type="submit">Continue</button>
-        <button class="button button-secondary" type="button" id="part-message-skip">Nothing yet</button>
-      </div>
-    </form>
-  `;
-
-  const form = document.querySelector("#part-message-form");
-  const input = document.querySelector("#part-message-input");
-  input.focus();
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.entry.partMessage = input.value.trim();
-    state.entry.partHasMessage = Boolean(state.entry.partMessage);
-    state.entry.partValidationText = getPartValidationText(state.entry.partMessage);
-    setScreen("part-validate");
-  });
-
-  document.querySelector("#part-message-skip").addEventListener("click", () => {
-    state.entry.partMessage = input.value.trim();
-    state.entry.partHasMessage = Boolean(state.entry.partMessage);
-    state.entry.partValidationText = getPartValidationText(state.entry.partMessage);
-    setScreen("part-validate");
-  });
-}
-
-function renderPartMoreScreen() {
-  renderInputScreen({
-    label: "CHECK IN",
-    main: "What else does this part want me to know?",
-    value: "",
-    onSubmit: (value) => {
-      const nextNote = value.trim();
-
-      if (nextNote) {
-        state.entry.partMessage = state.entry.partMessage
-          ? `${state.entry.partMessage}\n\n${nextNote}`
-          : nextNote;
-      }
-
-      state.entry.partHasMessage = Boolean(state.entry.partMessage.trim());
-      state.entry.partValidationText = getPartValidationText(state.entry.partMessage);
-      setScreen("part-validate");
-    },
-    placeholder: "There may be a little more here.",
-  });
-}
-
 function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrimary, onSecondary }) {
   checkinCard.innerHTML = `
     <div class="support-copy">
@@ -645,15 +581,15 @@ function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrim
   document.querySelector("#primary-action").addEventListener("click", onPrimary);
 }
 
-function renderClosing({ main, subtext }) {
+function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
   checkinCard.innerHTML = `
     <div class="closing-copy">
       <p class="eyebrow">CHECK IN</p>
       <h2>${escapeHtml(main)}</h2>
-      <p class="muted support-line">${escapeHtml(subtext)}</p>
+      ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
       ${renderPresenceDots()}
       <div class="actions">
-        <button class="button button-primary" type="button" id="finish-button">Finish</button>
+        <button class="button button-primary" type="button" id="finish-button">${escapeHtml(buttonText)}</button>
       </div>
     </div>
   `;
@@ -723,6 +659,10 @@ function renderPresenceDots() {
   return `<div class="pulse-dot" aria-hidden="true"></div>`;
 }
 
+function getPulseDelay() {
+  return 1500 + Math.floor(Math.random() * 1000);
+}
+
 function resetFlow() {
   state.screen = "opening";
   state.pauseMessage = "";
@@ -736,13 +676,11 @@ function saveEntry() {
   const entries = getEntries();
   entries.unshift({
     timestamp: new Date().toISOString(),
-    firstReflection: state.entry.firstReflection,
-    branch: state.entry.branch,
-    partMessage: state.entry.partMessage,
-    situationGoingOn: state.entry.situationGoingOn,
-    situationBothering: state.entry.situationBothering,
-    situationPerspective: state.entry.situationPerspective,
-    situationClearer: state.entry.situationClearer,
+    openingReflection: state.entry.openingReflection,
+    mainConcern: state.entry.mainConcern,
+    deeperReflection: state.entry.deeperReflection,
+    perspectiveReflection: state.entry.perspectiveReflection,
+    lightExitChoice: state.entry.lightExitChoice,
     closingAffirmation: state.entry.closingAffirmation,
     extractedKeywords: state.entry.extractedKeywords,
   });
@@ -760,12 +698,11 @@ function getEntries() {
 
 function collectEntryTexts(entry) {
   return [
-    entry.firstReflection,
-    entry.partMessage,
-    entry.situationGoingOn || entry.situationImportant,
-    entry.situationBothering,
-    entry.situationPerspective,
-    entry.situationClearer,
+    entry.openingReflection || entry.firstReflection,
+    entry.mainConcern || entry.partMessage || entry.situationGoingOn || entry.situationImportant,
+    entry.deeperReflection || entry.situationBothering,
+    entry.perspectiveReflection || entry.situationPerspective || entry.situationClearer,
+    entry.lightExitChoice,
   ].filter(Boolean);
 }
 
@@ -785,41 +722,19 @@ function selectAffirmation(keywords) {
   return "I checked in. That matters.";
 }
 
-function getPartValidationText(message = "") {
-  const trimmedMessage = message.trim();
-
-  if (!trimmedMessage) {
-    return chooseVariant(PART_VALIDATION_VARIANTS.quiet);
+function loopCheckIn() {
+  state.entry.loopCount += 1;
+  state.promptCopy = createPromptCopy(state.promptCopy);
+  state.entry.deeperReflection = "";
+  state.entry.perspectiveReflection = "";
+  state.entry.lightExitChoice = "";
+  if (state.entry.loopCount % 2 === 1) {
+    setScreen("third-reflection");
+    return;
   }
 
-  const normalizedMessage = trimmedMessage.toLowerCase();
-
-  if (matchesAnyKeyword(normalizedMessage, ["mad", "angry", "furious", "rage", "pissed"])) {
-    return chooseVariant(PART_VALIDATION_VARIANTS.anger);
-  }
-
-  if (matchesAnyKeyword(normalizedMessage, ["sad", "hurt", "alone", "rejected", "unlovable"])) {
-    return chooseVariant(PART_VALIDATION_VARIANTS.hurt);
-  }
-
-  if (
-    matchesAnyKeyword(normalizedMessage, [
-      "overwhelmed",
-      "too much",
-      "anxious",
-      "stress",
-      "can t handle",
-      "can't handle",
-    ])
-  ) {
-    return chooseVariant(PART_VALIDATION_VARIANTS.overwhelm);
-  }
-
-  return chooseVariant(PART_VALIDATION_VARIANTS.default);
-}
-
-function matchesAnyKeyword(text, keywords) {
-  return keywords.some((keyword) => text.includes(keyword));
+  state.entry.mainConcern = "";
+  setScreen("second-reflection");
 }
 
 function buildCalendar(entries, referenceDate) {
