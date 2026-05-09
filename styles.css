@@ -259,6 +259,39 @@ h2 {
   animation: fadeUp 360ms ease;
 }
 
+.home-choice-group {
+  width: 100%;
+}
+
+.home-entry-button {
+  justify-content: center;
+  text-align: center;
+  min-height: 56px;
+}
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.chip-button {
+  border: 1px solid var(--accent-border);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
+}
+
+.chip-button.is-selected {
+  background: rgba(142, 132, 122, 0.12);
+  border-color: rgba(141, 132, 122, 0.18);
+  color: var(--text-primary);
+}
+
 .opening-title {
   margin-bottom: 8px;
   font-size: clamp(2.5rem, 8vw, 4rem);
@@ -310,6 +343,139 @@ h2 {
   gap: 12px;
 }
 
+.calendar-shell {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.calendar-header h3,
+.calendar-header p {
+  margin-bottom: 0;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.calendar-weekday {
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.calendar-day {
+  min-height: 3.5rem;
+}
+
+.calendar-day-empty {
+  min-height: 3.5rem;
+}
+
+.calendar-day-button {
+  width: 100%;
+  min-height: 3.5rem;
+  border: 1px solid rgba(141, 132, 122, 0.08);
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.55);
+  padding: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.calendar-day-button:hover {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(141, 132, 122, 0.14);
+}
+
+.calendar-day-button.is-marked {
+  background: rgba(142, 132, 122, 0.08);
+  border-color: rgba(141, 132, 122, 0.16);
+}
+
+.calendar-day-button.is-off .calendar-day-dot {
+  background: rgba(120, 116, 110, 0.92);
+  opacity: 0.68;
+}
+
+.calendar-day-button.is-good .calendar-day-dot {
+  background: rgba(196, 182, 148, 0.95);
+  opacity: 0.82;
+}
+
+.calendar-day-button.is-mixed .calendar-day-dot {
+  background: rgba(160, 148, 128, 0.95);
+  opacity: 0.8;
+}
+
+.calendar-day-button.is-selected {
+  background: rgba(142, 132, 122, 0.14);
+  border-color: rgba(141, 132, 122, 0.24);
+}
+
+.calendar-day-button.is-today {
+  box-shadow: inset 0 0 0 1px rgba(141, 132, 122, 0.14);
+}
+
+.calendar-day-label {
+  font-size: 0.85rem;
+}
+
+.calendar-day-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0;
+}
+
+.calendar-day-button.is-marked .calendar-day-dot,
+.calendar-day-button.is-selected .calendar-day-dot {
+  opacity: 0.68;
+}
+
+.pattern-day-card {
+  display: grid;
+  gap: 0.9rem;
+  animation: fadeUp 280ms ease;
+}
+
+.pattern-day-card h3,
+.pattern-day-card p {
+  margin-bottom: 0;
+}
+
+.pattern-day-sections {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.pattern-day-section {
+  padding-top: 0.1rem;
+}
+
+.pattern-lines {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pattern-lines p {
+  margin-bottom: 0;
+}
+
 .insight-card {
   background: var(--card-bg-soft);
   border: 1px solid var(--accent-border);
@@ -350,8 +516,8 @@ h2 {
 }
 
 .pulse-dot {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   background-color: var(--accent-primary);
   border-radius: 50%;
   margin: 18px auto;
@@ -359,10 +525,26 @@ h2 {
   animation: breathePulse 3.6s infinite ease-in-out;
 }
 
+.presence-actions {
+  animation: fadeInSoft 320ms ease;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
     transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInSoft {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 
   to {

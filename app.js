@@ -33,24 +33,28 @@ const AFFIRMATIONS = [
 ];
 
 const FLOW_VARIANTS = {
-  validationOne: [
-    "That makes sense to me",
-    "I can see why that would feel this way to me",
-    "Of course that would bother me",
-    "That makes a lot of sense to me",
-    "I understand why that feels important to me",
-    "It makes sense that this is coming up for me",
-    "I’m really glad I noticed that",
+  offValidationOneShort: [
+    "Heard.",
+    "Of course.",
+    "I’m listening.",
+    "I can see that.",
+    "Something feels stirred up.",
+    "That’s here right now.",
   ],
-  validationOneLight: ["Heard", "I hear that", "I see that"],
-  deeperPrompt: [
-    "What about that feels the hardest?",
-    "What about that is bothering me the most?",
-    "What about that doesn’t sit right with me?",
-    "What about that feels most real to me right now?",
+  offValidationOneLong: [
+    "It makes sense this is coming up for me.",
+    "No wonder this feels heavy.",
+    "Of course this feels big.",
+    "This makes sense.",
   ],
-  deeperPromptLight: ["What about that?", "What feels off about that?", "What’s going on there?"],
-  validationTwo: [
+  offDeeperPrompt: [
+    "Does this feel new or older?",
+    "What feels stirred up from this?",
+    "What in me is reacting this strongly?",
+    "How old does this feeling feel?",
+    "What feels activated underneath this?",
+  ],
+  offValidationTwo: [
     "That makes sense to me too",
     "I can see why that would feel true to me",
     "Of course that would feel this way to me",
@@ -59,30 +63,36 @@ const FLOW_VARIANTS = {
     "That makes a lot of sense from where I am",
     "I’m really glad I noticed that",
   ],
-  grounding: [
+  offGrounding: [
     "I’m here with this",
     "I don’t need to push this away",
     "I can stay with this for a second",
     "This can be here, and I’m still okay",
     "I’m noticing this, not becoming it",
   ],
-  perspectivePrompt: [
+  offPerspectivePrompt: [
     "Is this the whole picture, or just part of it?",
     "Is there anything in me that feels different?",
     "What do I think about this from a steadier place?",
     "Is there another side to this at all?",
   ],
-  closing: [
+  offClosing: [
     "I see this a little more clearly",
     "I’m glad I checked in",
     "That helped",
     "I can come back to this anytime",
     "I don’t have to figure it all out right now",
   ],
-  lightExit: [
-    "That’s all I have right now, and that’s okay",
-    "I can just sit with this",
-    "I don’t have to go deeper right now",
+  goodValidation: [
+    "Hell yeah.",
+    "I want to remember this.",
+    "I’m really proud of this.",
+    "I want to celebrate this.",
+  ],
+  goodClosing: [
+    "I’m celebrating this.",
+    "I’m taking this with me.",
+    "I want to remember this feeling.",
   ],
 };
 
@@ -91,6 +101,7 @@ const state = {
   screen: "opening",
   pauseMessage: "",
   delayedRevealReady: false,
+  selectedPatternDate: "",
   promptCopy: createPromptCopy(),
   entry: createEmptyEntry(),
 };
@@ -106,37 +117,47 @@ renderThreads();
 
 function createEmptyEntry() {
   return {
-    openingReflection: "",
-    mainConcern: "",
+    entryType: "",
+    mainResponse: "",
+    offIsBrief: false,
+    bodyLocations: [],
+    bodyNote: "",
     deeperReflection: "",
     perspectiveReflection: "",
-    lightMode: false,
-    lightExitChoice: "",
+    rememberLine: "",
     loopCount: 0,
+    closingLine: "",
     closingAffirmation: "",
     extractedKeywords: [],
   };
 }
 
 function createPromptCopy(previous = {}) {
-  const validationOne = chooseVariant(FLOW_VARIANTS.validationOne, previous.validationOne);
-  const validationTwo = chooseVariant(
-    FLOW_VARIANTS.validationTwo.filter((option) => option !== validationOne),
-    previous.validationTwo
+  const offValidationOneShort = chooseVariant(
+    FLOW_VARIANTS.offValidationOneShort,
+    previous.offValidationOneShort
   );
-  const lightExitOptions = chooseMultipleVariants(FLOW_VARIANTS.lightExit, 3, previous.lightExitOptions);
+  const offValidationOneLong = chooseVariant(
+    FLOW_VARIANTS.offValidationOneLong,
+    previous.offValidationOneLong
+  );
+  const offValidationTwo = chooseVariant(
+    FLOW_VARIANTS.offValidationTwo.filter(
+      (option) => option !== offValidationOneShort && option !== offValidationOneLong
+    ),
+    previous.offValidationTwo
+  );
 
   return {
-    validationOne,
-    validationOneLight: chooseVariant(FLOW_VARIANTS.validationOneLight, previous.validationOneLight),
-    deeperPrompt: chooseVariant(FLOW_VARIANTS.deeperPrompt, previous.deeperPrompt),
-    deeperPromptLight: chooseVariant(FLOW_VARIANTS.deeperPromptLight, previous.deeperPromptLight),
-    validationTwo,
-    grounding: chooseVariant(FLOW_VARIANTS.grounding, previous.grounding),
-    perspectivePrompt: chooseVariant(FLOW_VARIANTS.perspectivePrompt, previous.perspectivePrompt),
-    closing: chooseVariant(FLOW_VARIANTS.closing, previous.closing),
-    lightExit: lightExitOptions[0],
-    lightExitOptions,
+    offValidationOneShort,
+    offValidationOneLong,
+    offDeeperPrompt: chooseVariant(FLOW_VARIANTS.offDeeperPrompt, previous.offDeeperPrompt),
+    offValidationTwo,
+    offGrounding: chooseVariant(FLOW_VARIANTS.offGrounding, previous.offGrounding),
+    offPerspectivePrompt: chooseVariant(FLOW_VARIANTS.offPerspectivePrompt, previous.offPerspectivePrompt),
+    offClosing: chooseVariant(FLOW_VARIANTS.offClosing, previous.offClosing),
+    goodValidation: chooseVariant(FLOW_VARIANTS.goodValidation, previous.goodValidation),
+    goodClosing: chooseVariant(FLOW_VARIANTS.goodClosing, previous.goodClosing),
   };
 }
 
@@ -148,15 +169,6 @@ function chooseVariant(options, previous = "") {
   const available = options.filter((option) => option !== previous);
   const pool = available.length ? available : options;
   return pool[Math.floor(Math.random() * pool.length)];
-}
-
-function chooseMultipleVariants(options, count, previous = []) {
-  const previousSet = new Set(previous);
-  const prioritized = options
-    .filter((option) => !previousSet.has(option))
-    .concat(options.filter((option) => previousSet.has(option)));
-
-  return prioritized.slice(0, Math.min(count, options.length));
 }
 
 function setActiveTab(tabName) {
@@ -180,113 +192,152 @@ function renderCheckIn() {
     case "opening":
       renderOpeningScreen();
       break;
-    case "intro":
+    case "off-intro":
       renderMessageScreen({
         label: "CHECK IN",
         main: "Something feels off",
         buttonText: "Let me pause for a second",
-        onContinue: () => setScreen("first-reflection"),
+        onContinue: () => setScreen("off-main"),
       });
       break;
-    case "first-reflection":
+    case "good-intro":
+      renderMessageScreen({
+        label: "CHECK IN",
+        main: "Something feels good",
+        buttonText: "Let me stay with that",
+        onContinue: () => setScreen("good-main"),
+      });
+      break;
+    case "off-main":
       renderInputScreen({
         label: "CHECK IN",
-        main: "I’m checking in",
-        subtext: "What’s going on with me?",
-        value: state.entry.openingReflection,
+        main: "What’s going on?",
+        value: state.entry.mainResponse,
         onSubmit: (value) => {
-          state.entry.openingReflection = value.trim();
-          setScreen("second-reflection");
+          state.entry.mainResponse = value.trim();
+          state.entry.offIsBrief = state.entry.mainResponse.length > 0 && state.entry.mainResponse.length < 25;
+          setScreen("off-validation-one");
         },
       });
       break;
-    case "second-reflection":
-      renderInputScreen({
-        label: "CHECK IN",
-        main: "What’s really getting to me?",
-        value: state.entry.mainConcern,
-        onSubmit: (value) => {
-          state.entry.mainConcern = value.trim();
-          state.entry.lightMode = state.entry.mainConcern.length < 25;
-          setScreen("validation-one");
-        },
-      });
-      break;
-    case "validation-one":
+    case "off-validation-one":
       renderDelayedContinueScreen({
-        screen: "validation-one",
-        main: state.entry.lightMode ? state.promptCopy.validationOneLight : state.promptCopy.validationOne,
+        label: "CHECK IN",
+        main: state.entry.offIsBrief
+          ? state.promptCopy.offValidationOneShort
+          : state.promptCopy.offValidationOneLong,
         buttonLabel: "Keep going",
-        onContinue: () => setScreen("third-reflection"),
+        onContinue: () => setScreen("off-body"),
       });
       break;
-    case "third-reflection":
+    case "off-body":
+      renderBodyLocationScreen({
+        label: "CHECK IN",
+        main: "Where do I notice this most?",
+        subtext: "No need to explain it yet. Just notice where it shows up.",
+        selections: state.entry.bodyLocations,
+        note: state.entry.bodyNote,
+        onSubmit: ({ selections, note }) => {
+          state.entry.bodyLocations = selections;
+          state.entry.bodyNote = note.trim();
+          setScreen("off-deeper");
+        },
+      });
+      break;
+    case "off-deeper":
       renderInputScreen({
         label: "CHECK IN",
-        main: state.entry.lightMode ? state.promptCopy.deeperPromptLight : state.promptCopy.deeperPrompt,
+        main: state.promptCopy.offDeeperPrompt,
         value: state.entry.deeperReflection,
         onSubmit: (value) => {
           state.entry.deeperReflection = value.trim();
-          if (state.entry.lightMode && state.entry.deeperReflection.length < 25) {
-            setScreen("light-exit");
-            return;
-          }
-
-          setScreen("validation-two");
+          setScreen("off-validation-two");
         },
       });
       break;
-    case "light-exit":
-      renderChoiceScreen({
+    case "off-validation-two":
+      renderDelayedContinueScreen({
         label: "CHECK IN",
-        main: state.promptCopy.lightExit,
-        choices: state.promptCopy.lightExitOptions,
-        onChoose: (choice) => {
-          state.entry.lightExitChoice = choice;
-          setScreen("grounding");
-        },
-      });
-      break;
-    case "validation-two":
-      renderDelayedContinueScreen({
-        screen: "validation-two",
-        main: state.promptCopy.validationTwo,
+        main: state.promptCopy.offValidationTwo,
         buttonLabel: "Keep going",
-        onContinue: () => setScreen("grounding"),
+        onContinue: () => setScreen("off-grounding"),
       });
       break;
-    case "grounding":
+    case "off-grounding":
       renderDelayedContinueScreen({
-        screen: "grounding",
-        main: state.promptCopy.grounding,
+        label: "CHECK IN",
+        main: state.promptCopy.offGrounding,
         buttonLabel: "Keep going",
-        onContinue: () => setScreen("perspective"),
+        onContinue: () => setScreen("off-perspective"),
       });
       break;
-    case "perspective":
+    case "off-perspective":
       renderInputScreen({
         label: "CHECK IN",
-        main: state.promptCopy.perspectivePrompt,
+        main: state.promptCopy.offPerspectivePrompt,
         value: state.entry.perspectiveReflection,
         onSubmit: (value) => {
           state.entry.perspectiveReflection = value.trim();
-          setScreen("clearer");
+          setScreen("off-clearer");
         },
       });
       break;
-    case "clearer":
+    case "off-clearer":
       renderLandingScreen({
         label: "CHECK IN",
         main: "Does this feel a little clearer, or is there more here?",
         primaryLabel: "This feels clearer",
         secondaryLabel: "There’s more",
-        onPrimary: () => finishCheckIn("closing"),
+        onPrimary: () => finishCheckIn("closing", state.promptCopy.offClosing),
         onSecondary: loopCheckIn,
+      });
+      break;
+    case "good-main":
+      renderInputScreen({
+        label: "CHECK IN",
+        main: "What feels good right now?",
+        value: state.entry.mainResponse,
+        onSubmit: (value) => {
+          state.entry.mainResponse = value.trim();
+          setScreen("good-validation");
+        },
+      });
+      break;
+    case "good-validation":
+      renderDelayedContinueScreen({
+        label: "CHECK IN",
+        main: state.promptCopy.goodValidation,
+        buttonLabel: "Keep going",
+        onContinue: () => setScreen("good-body"),
+      });
+      break;
+    case "good-body":
+      renderBodyLocationScreen({
+        label: "CHECK IN",
+        main: "Where do I notice this in me?",
+        selections: state.entry.bodyLocations,
+        note: state.entry.bodyNote,
+        onSubmit: ({ selections, note }) => {
+          state.entry.bodyLocations = selections;
+          state.entry.bodyNote = note.trim();
+          setScreen("good-remember");
+        },
+      });
+      break;
+    case "good-remember":
+      renderInputScreen({
+        label: "CHECK IN",
+        main: "What do I want to remember about this?",
+        value: state.entry.rememberLine,
+        onSubmit: (value) => {
+          state.entry.rememberLine = value.trim();
+          finishCheckIn("closing", state.promptCopy.goodClosing);
+        },
       });
       break;
     case "closing":
       renderClosing({
-        main: state.promptCopy.closing,
+        main: state.entry.closingLine,
         buttonText: "Back to start",
       });
       break;
@@ -306,14 +357,25 @@ function renderOpeningScreen() {
   checkinCard.innerHTML = `
     <div class="opening-screen">
       <p class="muted support-line">I want to check in.</p>
-      <div class="actions">
-        <button class="button button-primary" type="button" id="begin-button">Begin</button>
+      <div class="choice-group home-choice-group">
+        <button class="button button-secondary home-entry-button" type="button" id="off-begin-button">
+          Something feels off
+        </button>
+        <button class="button button-secondary home-entry-button" type="button" id="good-begin-button">
+          Something feels good
+        </button>
       </div>
     </div>
   `;
 
-  document.querySelector("#begin-button").addEventListener("click", () => {
-    setScreen("intro");
+  document.querySelector("#off-begin-button").addEventListener("click", () => {
+    state.entry.entryType = "off";
+    setScreen("off-intro");
+  });
+
+  document.querySelector("#good-begin-button").addEventListener("click", () => {
+    state.entry.entryType = "good";
+    setScreen("good-intro");
   });
 }
 
@@ -341,19 +403,19 @@ function renderMessageScreen({
 }
 
 function renderDelayedContinueScreen({
-  screen,
+  label = "CHECK IN",
   main,
   subtext = "",
   buttonLabel,
   onContinue,
-  delayMs = getPulseDelay(),
 }) {
-  renderSilentPresenceStep({
-    screen,
+  renderMessageScreen({
+    label,
     main,
-    buttonLabel,
+    subtext,
+    buttonText: buttonLabel,
     onContinue,
-    delayMs,
+    includePulse: true,
   });
 }
 
@@ -393,29 +455,69 @@ function renderInputScreen({
   });
 }
 
-function renderChoiceScreen({ label, main, choices, onChoose }) {
+function renderBodyLocationScreen({ label, main, subtext = "", selections, note, onSubmit }) {
+  const chips = [
+    "chest",
+    "throat",
+    "stomach",
+    "jaw",
+    "shoulders",
+    "face",
+    "hands",
+    "everywhere",
+    "hard to tell",
+  ];
+
   checkinCard.innerHTML = `
-    <div class="support-copy">
-      <p class="eyebrow">${escapeHtml(label)}</p>
-      <h2>${escapeHtml(main)}</h2>
-      <div class="choice-group">
-        ${choices
+    <form id="body-location-form">
+      <div class="question">
+        <p class="eyebrow">${escapeHtml(label)}</p>
+        <h2>${escapeHtml(main)}</h2>
+        ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
+      </div>
+      <div class="chip-group">
+        ${chips
           .map(
-            (choice, index) => `
-              <button class="button button-secondary" type="button" data-choice-index="${index}">
-                ${escapeHtml(choice)}
+            (chip) => `
+              <button
+                class="chip-button${selections.includes(chip) ? " is-selected" : ""}"
+                type="button"
+                data-chip-value="${escapeAttribute(chip)}"
+              >
+                ${escapeHtml(chip)}
               </button>
             `
           )
           .join("")}
       </div>
-    </div>
+      <textarea
+        id="body-note-input"
+        class="text-input text-input-compact"
+      >${escapeHtml(note)}</textarea>
+      <div class="actions">
+        <button class="button button-primary" type="submit">Continue</button>
+      </div>
+    </form>
   `;
 
-  document.querySelectorAll("[data-choice-index]").forEach((button) => {
+  const selected = new Set(selections);
+  document.querySelectorAll("[data-chip-value]").forEach((button) => {
     button.addEventListener("click", () => {
-      const choice = choices[Number(button.dataset.choiceIndex)];
-      onChoose(choice);
+      const value = button.dataset.chipValue;
+      if (selected.has(value)) {
+        selected.delete(value);
+      } else {
+        selected.add(value);
+      }
+      button.classList.toggle("is-selected", selected.has(value));
+    });
+  });
+
+  document.querySelector("#body-location-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    onSubmit({
+      selections: [...selected],
+      note: document.querySelector("#body-note-input").value,
     });
   });
 }
@@ -534,31 +636,19 @@ function renderPresenceStep({ screen, main, reveal, buttonLabel, onContinue, del
   }
 }
 
-function renderSilentPresenceStep({ screen, main, buttonLabel, onContinue, delayMs = 3000 }) {
-  if (!state.delayedRevealReady) {
-    scheduleReveal(screen, delayMs);
-  }
-
+function renderSilentPresenceStep({ screen, main, buttonLabel, onContinue }) {
   checkinCard.innerHTML = `
     <div class="support-copy">
       <p class="eyebrow">CHECK IN</p>
       <h2>${escapeHtml(main)}</h2>
       ${renderPresenceDots()}
-      ${
-        state.delayedRevealReady
-          ? `
-            <div class="actions">
-              <button class="button button-primary" type="button" id="presence-continue">${escapeHtml(buttonLabel)}</button>
-            </div>
-          `
-          : ""
-      }
+      <div class="actions presence-actions">
+        <button class="button button-primary" type="button" id="presence-continue">${escapeHtml(buttonLabel)}</button>
+      </div>
     </div>
   `;
 
-  if (state.delayedRevealReady) {
-    document.querySelector("#presence-continue").addEventListener("click", onContinue);
-  }
+  document.querySelector("#presence-continue").addEventListener("click", onContinue);
 }
 
 function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrimary, onSecondary }) {
@@ -600,55 +690,57 @@ function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
 function renderThreads() {
   const entries = getEntries();
   const calendar = buildCalendar(entries, new Date());
-  const patternLines = buildRecentPatterns(entries);
+  const selectedDate = resolveSelectedPatternDate(entries, calendar);
+  const selectedEntries = getEntriesForDate(entries, selectedDate);
+  const patternLines = buildInnerPatternLines(entries, selectedEntries);
 
   threadsContent.innerHTML = `
     <div class="insight-card">
-      <div
-        class="calendar-shell"
-        role="img"
-        aria-label="A simple calendar view of recent check-ins"
-        style="display:grid; gap:0.75rem;"
-      >
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem;">
-          <h3 style="margin:0;">${escapeHtml(calendar.monthLabel)}</h3>
-          <p class="muted" style="margin:0;">A few days stand out.</p>
+      <div class="calendar-shell" aria-label="A simple calendar view of saved check-ins">
+        <div class="calendar-header">
+          <h3>${escapeHtml(calendar.monthLabel)}</h3>
+          <p class="muted">A few days stand out.</p>
         </div>
-        <div
-          class="calendar-weekdays"
-          style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:0.35rem;"
-        >
+        <div class="calendar-weekdays">
           ${calendar.weekdays
             .map(
               (day) => `
-                <span class="muted" style="font-size:0.75rem; text-align:center;">${escapeHtml(day)}</span>
+                <span class="muted calendar-weekday">${escapeHtml(day)}</span>
               `
             )
             .join("")}
         </div>
-        <div
-          class="calendar-grid"
-          style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:0.35rem;"
-        >
+        <div class="calendar-grid">
           ${calendar.days.map(renderCalendarDay).join("")}
         </div>
       </div>
     </div>
     <div class="insight-card">
-      <h3>Recent patterns</h3>
-      <div style="display:grid; gap:0.5rem;">
+      ${renderPatternDayCard(selectedDate, selectedEntries)}
+    </div>
+    <div class="insight-card">
+      <h3>This shows up in me</h3>
+      <div class="pattern-lines">
         ${patternLines
-          .map((line) => `<p class="muted" style="margin:0;">${escapeHtml(line)}</p>`)
+          .map((line) => `<p class="muted">${escapeHtml(line)}</p>`)
           .join("")}
       </div>
     </div>
   `;
+
+  document.querySelectorAll("[data-pattern-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPatternDate = button.dataset.patternDate;
+      renderThreads();
+    });
+  });
 }
 
-function finishCheckIn(closingScreen = "closing") {
+function finishCheckIn(closingScreen = "closing", closingLine = "") {
   const extractedKeywords = extractKeywordsForEntry(state.entry);
   state.entry.extractedKeywords = extractedKeywords;
   state.entry.closingAffirmation = selectAffirmation(extractedKeywords);
+  state.entry.closingLine = closingLine || state.promptCopy.offClosing;
   saveEntry();
   state.screen = closingScreen;
   renderCheckIn();
@@ -676,11 +768,14 @@ function saveEntry() {
   const entries = getEntries();
   entries.unshift({
     timestamp: new Date().toISOString(),
-    openingReflection: state.entry.openingReflection,
-    mainConcern: state.entry.mainConcern,
+    entryType: state.entry.entryType,
+    mainResponse: state.entry.mainResponse,
+    bodyLocations: state.entry.bodyLocations,
+    bodyNote: state.entry.bodyNote,
     deeperReflection: state.entry.deeperReflection,
     perspectiveReflection: state.entry.perspectiveReflection,
-    lightExitChoice: state.entry.lightExitChoice,
+    rememberLine: state.entry.rememberLine,
+    closingLine: state.entry.closingLine,
     closingAffirmation: state.entry.closingAffirmation,
     extractedKeywords: state.entry.extractedKeywords,
   });
@@ -698,11 +793,13 @@ function getEntries() {
 
 function collectEntryTexts(entry) {
   return [
-    entry.openingReflection || entry.firstReflection,
-    entry.mainConcern || entry.partMessage || entry.situationGoingOn || entry.situationImportant,
+    entry.mainResponse || entry.openingReflection || entry.firstReflection,
+    (entry.bodyLocations || []).join(" "),
+    entry.bodyNote,
     entry.deeperReflection || entry.situationBothering,
     entry.perspectiveReflection || entry.situationPerspective || entry.situationClearer,
-    entry.lightExitChoice,
+    entry.rememberLine,
+    entry.closingLine,
   ].filter(Boolean);
 }
 
@@ -725,16 +822,17 @@ function selectAffirmation(keywords) {
 function loopCheckIn() {
   state.entry.loopCount += 1;
   state.promptCopy = createPromptCopy(state.promptCopy);
+  state.entry.bodyLocations = [];
+  state.entry.bodyNote = "";
   state.entry.deeperReflection = "";
   state.entry.perspectiveReflection = "";
-  state.entry.lightExitChoice = "";
   if (state.entry.loopCount % 2 === 1) {
-    setScreen("third-reflection");
+    setScreen("off-body");
     return;
   }
 
-  state.entry.mainConcern = "";
-  setScreen("second-reflection");
+  state.entry.mainResponse = "";
+  setScreen("off-main");
 }
 
 function buildCalendar(entries, referenceDate) {
@@ -750,13 +848,17 @@ function buildCalendar(entries, referenceDate) {
   }
 
   for (let dayNumber = 1; dayNumber <= lastDay.getDate(); dayNumber += 1) {
-    const count = marks.get(dayNumber) || 0;
+    const dayInfo = marks.get(dayNumber) || { count: 0, markerType: "" };
+    const dateKey = formatDateKey(year, month, dayNumber);
     days.push({
       empty: false,
       key: `day-${dayNumber}`,
       label: String(dayNumber),
-      count,
-      marked: count > 0,
+      dateKey,
+      count: dayInfo.count,
+      markerType: dayInfo.markerType,
+      marked: dayInfo.count > 0,
+      selected: state.selectedPatternDate === dateKey,
       isToday:
         dayNumber === referenceDate.getDate() &&
         month === new Date().getMonth() &&
@@ -780,40 +882,19 @@ function buildCalendar(entries, referenceDate) {
 
 function renderCalendarDay(day) {
   if (day.empty) {
-    return `<div aria-hidden="true" style="min-height:3.5rem;"></div>`;
+    return `<div class="calendar-day calendar-day-empty" aria-hidden="true"></div>`;
   }
 
-  const borderColor = day.marked ? "rgba(209, 160, 120, 0.55)" : "rgba(255, 255, 255, 0.08)";
-  const background = day.marked ? "rgba(209, 160, 120, 0.12)" : "rgba(255, 255, 255, 0.03)";
-  const ring = day.isToday ? "box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);" : "";
-
   return `
-    <div
-      style="
-        min-height:3.5rem;
-        border-radius:0.9rem;
-        border:1px solid ${borderColor};
-        background:${background};
-        padding:0.45rem;
-        display:flex;
-        flex-direction:column;
-        justify-content:space-between;
-        ${ring}
-      "
+    <button
+      class="calendar-day-button${day.marked ? " is-marked" : ""}${day.selected ? " is-selected" : ""}${day.isToday ? " is-today" : ""}${day.markerType ? ` is-${day.markerType}` : ""}"
+      type="button"
+      data-pattern-date="${escapeAttribute(day.dateKey)}"
       aria-label="${escapeAttribute(buildCalendarDayLabel(day))}"
     >
-      <span style="font-size:0.85rem;">${escapeHtml(day.label)}</span>
-      <span
-        aria-hidden="true"
-        style="
-          width:0.4rem;
-          height:0.4rem;
-          border-radius:999px;
-          background:${day.marked ? "currentColor" : "transparent"};
-          opacity:${day.marked ? "0.75" : "0"};
-        "
-      ></span>
-    </div>
+      <span class="calendar-day-label">${escapeHtml(day.label)}</span>
+      <span class="calendar-day-dot" aria-hidden="true"></span>
+    </button>
   `;
 }
 
@@ -848,30 +929,178 @@ function getEntryCountByDay(entries, year, month) {
     }
 
     const day = date.getDate();
-    counts.set(day, (counts.get(day) || 0) + 1);
+    const current = counts.get(day) || { count: 0, types: new Set() };
+    current.count += 1;
+    current.types.add(entry.entryType || "off");
+    counts.set(day, current);
   });
 
-  return counts;
+  return new Map(
+    [...counts.entries()].map(([day, info]) => {
+      const markerType =
+        info.types.size > 1 ? "mixed" : info.types.has("good") ? "good" : "off";
+      return [day, { count: info.count, markerType }];
+    })
+  );
 }
 
-function buildRecentPatterns(entries) {
-  const repeatedWords = getRepeatedKeywords(entries, 2);
-  const recentThemes = getTopTerms(entries.flatMap((entry) => collectEntryTexts(entry)), 2);
-  const lines = [];
-
-  lines.push("This has come up a few times.");
-
-  if (repeatedWords[0]) {
-    lines.push(`Similar feeling: ${capitalize(repeatedWords[0])}`);
-  } else if (recentThemes[0]) {
-    lines.push(`Similar feeling: ${capitalize(recentThemes[0])}`);
-  } else {
-    lines.push("Similar feeling: overwhelm");
+function resolveSelectedPatternDate(entries, calendar) {
+  if (state.selectedPatternDate && calendar.days.some((day) => !day.empty && day.dateKey === state.selectedPatternDate)) {
+    return state.selectedPatternDate;
   }
 
-  lines.push("Usually passes in a few days.");
+  const firstMarkedDay = calendar.days.find((day) => !day.empty && day.marked);
+  const fallbackDay = calendar.days.find((day) => !day.empty && day.isToday) || calendar.days.find((day) => !day.empty);
+  const selected = (firstMarkedDay || fallbackDay)?.dateKey || "";
+  state.selectedPatternDate = selected;
+  return selected;
+}
 
-  return lines;
+function getEntriesForDate(entries, dateKey) {
+  return entries.filter((entry) => entry.timestamp && toDateKey(new Date(entry.timestamp)) === dateKey);
+}
+
+function renderPatternDayCard(selectedDate, entries) {
+  if (!selectedDate) {
+    return `
+      <div class="pattern-day-card">
+        <h3>Nothing saved here.</h3>
+        <p class="muted">That doesn’t mean nothing was happening. There just isn’t a note from this day.</p>
+      </div>
+    `;
+  }
+
+  const dayLabel = formatReadableDate(selectedDate);
+
+  if (!entries.length) {
+    return `
+      <div class="pattern-day-card">
+        <p class="eyebrow">${escapeHtml(dayLabel)}</p>
+        <h3>Nothing saved here.</h3>
+        <p class="muted">That doesn’t mean nothing was happening. There just isn’t a note from this day.</p>
+      </div>
+    `;
+  }
+
+  const summary = buildDaySummary(entries, selectedDate);
+
+  return `
+    <div class="pattern-day-card">
+      <p class="eyebrow">${escapeHtml(dayLabel)}</p>
+      <h3>${escapeHtml(summary.topLine)}</h3>
+      <div class="pattern-day-sections">
+        <div class="pattern-day-section">
+          <p class="eyebrow">${escapeHtml(summary.entryTypeLabel)}</p>
+          <p>${escapeHtml(summary.mainResponse)}</p>
+        </div>
+        <div class="pattern-day-section">
+          <p class="eyebrow">Where I Noticed It</p>
+          <p>${escapeHtml(summary.bodyLine)}</p>
+        </div>
+        ${
+          summary.remembered
+            ? `
+              <div class="pattern-day-section">
+                <p class="eyebrow">${escapeHtml(summary.rememberedLabel)}</p>
+                <p>${escapeHtml(summary.remembered)}</p>
+              </div>
+            `
+            : ""
+        }
+      </div>
+    </div>
+  `;
+}
+
+function buildDaySummary(entries, selectedDate) {
+  const topLines = [
+    "Something in me was active here.",
+    "I noticed something in me on this day.",
+    "I had something worth listening to here.",
+    "There was something here worth noticing.",
+  ];
+  const topLine = topLines[hashString(selectedDate) % topLines.length];
+  const latestEntry = entries[0];
+  const bodyBits = [
+    ...(latestEntry.bodyLocations || []),
+    latestEntry.bodyNote,
+  ].filter(Boolean);
+  const remembered = latestEntry.rememberLine || latestEntry.perspectiveReflection || latestEntry.closingLine;
+
+  return {
+    topLine,
+    entryTypeLabel: latestEntry.entryType === "good" ? "Something Felt Good" : "Something Felt Off",
+    mainResponse: shortenText(latestEntry.mainResponse || "There wasn’t much written here, and that still counts."),
+    bodyLine: bodyBits.length ? shortenText(bodyBits.join(", "), 110) : "I didn’t name a place here, but something was still there.",
+    remembered,
+    rememberedLabel: latestEntry.entryType === "good" ? "What I Want To Remember" : "What Shifted",
+  };
+}
+
+function buildInnerPatternLines(entries, selectedEntries) {
+  if (entries.length < 3) {
+    return ["Patterns will appear gently as more check-ins are saved."];
+  }
+
+  const repeatedWords = getRepeatedKeywords(entries, 3);
+  const recentThemes = getTopTerms(entries.flatMap((entry) => collectEntryTexts(entry)), 4);
+  const lines = [];
+
+  if (repeatedWords[0] || recentThemes[0]) {
+    lines.push("This feeling has shown up more than once.");
+  }
+
+  if (repeatedWords[1]) {
+    lines.push(`This seems connected to ${repeatedWords[1]}.`);
+  } else if (recentThemes[0]) {
+    lines.push(`I’ve met something like this around ${recentThemes[0]} before.`);
+  }
+
+  if (selectedEntries.length && repeatedWords[0]) {
+    lines.push("This isn’t the first time this has come up.");
+  } else if (recentThemes[1]) {
+    lines.push(`Something in me tends to get louder around ${recentThemes[1]}.`);
+  }
+
+  return lines.length ? lines.slice(0, 3) : ["Patterns will appear gently as more check-ins are saved."];
+}
+
+function formatDateKey(year, month, day) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function toDateKey(date) {
+  return formatDateKey(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatReadableDate(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function shortenText(text = "", limit = 90) {
+  const trimmed = text.trim();
+
+  if (trimmed.length <= limit) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, limit).trimEnd()}...`;
+}
+
+function hashString(value = "") {
+  let hash = 0;
+
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  return hash;
 }
 
 function getTopTerms(values, limit) {
