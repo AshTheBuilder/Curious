@@ -335,12 +335,45 @@ h2 {
 }
 
 .threads-copy {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .threads-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+}
+
+.session-log-list {
+  display: grid;
+  gap: 10px;
+}
+
+.session-log-card,
+.session-log-empty {
+  display: grid;
+  gap: 0.45rem;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--card-bg-soft);
+  border: 1px solid rgba(141, 132, 122, 0.08);
+  animation: fadeUp 280ms ease;
+}
+
+.session-log-card h3,
+.session-log-card p,
+.session-log-empty h3,
+.session-log-empty p {
+  margin-bottom: 0;
+}
+
+.session-log-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 2px;
+}
+
+.session-log-clear {
+  min-height: 42px;
 }
 
 .calendar-shell {
@@ -402,8 +435,8 @@ h2 {
 }
 
 .calendar-day-button.is-marked {
-  background: rgba(142, 132, 122, 0.08);
-  border-color: rgba(141, 132, 122, 0.16);
+  background: rgba(142, 132, 122, 0.06);
+  border-color: rgba(141, 132, 122, 0.12);
 }
 
 .calendar-day-button.is-off .calendar-day-dot {
@@ -422,8 +455,8 @@ h2 {
 }
 
 .calendar-day-button.is-selected {
-  background: rgba(142, 132, 122, 0.14);
-  border-color: rgba(141, 132, 122, 0.24);
+  background: rgba(142, 132, 122, 0.1);
+  border-color: rgba(141, 132, 122, 0.18);
 }
 
 .calendar-day-button.is-today {
@@ -449,7 +482,7 @@ h2 {
 
 .pattern-day-card {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.75rem;
   animation: fadeUp 280ms ease;
 }
 
@@ -460,7 +493,7 @@ h2 {
 
 .pattern-day-sections {
   display: grid;
-  gap: 0.85rem;
+  gap: 0.65rem;
 }
 
 .pattern-day-section {
@@ -469,7 +502,7 @@ h2 {
 
 .pattern-lines {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .pattern-lines p {
@@ -480,12 +513,12 @@ h2 {
   background: var(--card-bg-soft);
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-lg);
-  padding: 16px;
+  padding: 15px 16px;
 }
 
 .insight-card h3 {
-  margin-bottom: 8px;
-  font-size: 1rem;
+  margin-bottom: 6px;
+  font-size: 0.98rem;
 }
 
 .insight-card p {

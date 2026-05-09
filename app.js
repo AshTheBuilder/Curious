@@ -3,50 +3,22 @@ const checkinCard = document.querySelector("#checkin-card");
 const threadsContent = document.querySelector("#threads-content");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
-const CALENDAR_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-const AFFIRMATIONS = [
-  {
-    keywords: ["alone", "abandoned", "left"],
-    text: "I am here with myself right now.",
-  },
-  {
-    keywords: ["much", "burden", "pressure", "responsible", "carrying", "carry"],
-    text: "I do not have to carry all of this at once.",
-  },
-  {
-    keywords: ["rejected", "chosen", "replaced", "unwanted"],
-    text: "This hurt, and I do not have to make it bigger than it is.",
-  },
-  {
-    keywords: ["scared", "unsafe", "afraid"],
-    text: "I can go slowly with this.",
-  },
-  {
-    keywords: ["shame", "bad", "wrong", "enough"],
-    text: "I can stay kind with what I am noticing.",
-  },
-  {
-    keywords: ["control", "manage", "fix"],
-    text: "I do not have to solve everything right now.",
-  },
+const CONTEXT_TAGS = [
+  "hormones may be part of this",
+  "relationship",
+  "work",
+  "family",
+  "kids",
+  "grief",
+  "money",
+  "body",
+  "old feeling",
+  "new feeling",
+  "tired",
+  "good moment",
 ];
 
 const FLOW_VARIANTS = {
-  offValidationOneShort: [
-    "Heard.",
-    "Of course.",
-    "I’m listening.",
-    "I can see that.",
-    "Something feels stirred up.",
-    "That’s here right now.",
-  ],
-  offValidationOneLong: [
-    "It makes sense this is coming up for me.",
-    "No wonder this feels heavy.",
-    "Of course this feels big.",
-    "This makes sense.",
-  ],
   offDeeperPrompt: [
     "Does this feel new or older?",
     "What feels stirred up from this?",
@@ -54,34 +26,32 @@ const FLOW_VARIANTS = {
     "How old does this feeling feel?",
     "What feels activated underneath this?",
   ],
-  offValidationTwo: [
-    "That makes sense to me too",
-    "I can see why that would feel true to me",
-    "Of course that would feel this way to me",
-    "That feels really real to me right now",
-    "I understand why that would land that way for me",
-    "That makes a lot of sense from where I am",
-    "I’m really glad I noticed that",
-  ],
+  offSpaciousPrompt: ["What else do I notice now?"],
   offGrounding: [
     "I’m here with this",
-    "I don’t need to push this away",
-    "I can stay with this for a second",
-    "This can be here, and I’m still okay",
-    "I’m noticing this, not becoming it",
+    "I can stay here a little longer",
+    "I don’t need to rush this",
+    "There’s room for this",
+    "I can notice this without following it",
   ],
   offPerspectivePrompt: [
-    "Is this the whole picture, or just part of it?",
-    "Is there anything in me that feels different?",
-    "What do I think about this from a steadier place?",
-    "Is there another side to this at all?",
+    "Where am I now with this?",
+    "What feels most true right now?",
+    "What do I notice from a little farther back?",
+    "What feels a little different now?",
   ],
+  offMorePrompt: ["I have more to say."],
   offClosing: [
-    "I see this a little more clearly",
-    "I’m glad I checked in",
-    "That helped",
-    "I can come back to this anytime",
-    "I don’t have to figure it all out right now",
+    "I made space for this.",
+    "I can come back if there’s more.",
+    "This doesn’t have to be solved right now.",
+    "I stayed with this for a minute.",
+  ],
+  offReflectionFallback: [
+    "There’s room here.",
+    "I can keep noticing.",
+    "There may be more here.",
+    "I don’t need to rush this.",
   ],
   goodValidation: [
     "Hell yeah.",
@@ -118,14 +88,19 @@ renderThreads();
 function createEmptyEntry() {
   return {
     entryType: "",
+    id: "",
     mainResponse: "",
-    offIsBrief: false,
     bodyLocations: [],
     bodyNote: "",
+    contextTags: [],
     deeperReflection: "",
+    spaciousReflection: "",
     perspectiveReflection: "",
+    continuationReflection: "",
+    stayLoopCount: 0,
     rememberLine: "",
     loopCount: 0,
+    sessionSummary: "",
     closingLine: "",
     closingAffirmation: "",
     extractedKeywords: [],
@@ -133,29 +108,14 @@ function createEmptyEntry() {
 }
 
 function createPromptCopy(previous = {}) {
-  const offValidationOneShort = chooseVariant(
-    FLOW_VARIANTS.offValidationOneShort,
-    previous.offValidationOneShort
-  );
-  const offValidationOneLong = chooseVariant(
-    FLOW_VARIANTS.offValidationOneLong,
-    previous.offValidationOneLong
-  );
-  const offValidationTwo = chooseVariant(
-    FLOW_VARIANTS.offValidationTwo.filter(
-      (option) => option !== offValidationOneShort && option !== offValidationOneLong
-    ),
-    previous.offValidationTwo
-  );
-
   return {
-    offValidationOneShort,
-    offValidationOneLong,
     offDeeperPrompt: chooseVariant(FLOW_VARIANTS.offDeeperPrompt, previous.offDeeperPrompt),
-    offValidationTwo,
+    offSpaciousPrompt: chooseVariant(FLOW_VARIANTS.offSpaciousPrompt, previous.offSpaciousPrompt),
     offGrounding: chooseVariant(FLOW_VARIANTS.offGrounding, previous.offGrounding),
     offPerspectivePrompt: chooseVariant(FLOW_VARIANTS.offPerspectivePrompt, previous.offPerspectivePrompt),
+    offMorePrompt: chooseVariant(FLOW_VARIANTS.offMorePrompt, previous.offMorePrompt),
     offClosing: chooseVariant(FLOW_VARIANTS.offClosing, previous.offClosing),
+    offReflectionFallback: chooseVariant(FLOW_VARIANTS.offReflectionFallback, previous.offReflectionFallback),
     goodValidation: chooseVariant(FLOW_VARIANTS.goodValidation, previous.goodValidation),
     goodClosing: chooseVariant(FLOW_VARIANTS.goodClosing, previous.goodClosing),
   };
@@ -215,19 +175,8 @@ function renderCheckIn() {
         value: state.entry.mainResponse,
         onSubmit: (value) => {
           state.entry.mainResponse = value.trim();
-          state.entry.offIsBrief = state.entry.mainResponse.length > 0 && state.entry.mainResponse.length < 25;
-          setScreen("off-validation-one");
+          setScreen("off-body");
         },
-      });
-      break;
-    case "off-validation-one":
-      renderDelayedContinueScreen({
-        label: "CHECK IN",
-        main: state.entry.offIsBrief
-          ? state.promptCopy.offValidationOneShort
-          : state.promptCopy.offValidationOneLong,
-        buttonLabel: "Keep going",
-        onContinue: () => setScreen("off-body"),
       });
       break;
     case "off-body":
@@ -248,19 +197,35 @@ function renderCheckIn() {
       renderInputScreen({
         label: "CHECK IN",
         main: state.promptCopy.offDeeperPrompt,
-        value: state.entry.deeperReflection,
+        value: "",
         onSubmit: (value) => {
           state.entry.deeperReflection = value.trim();
-          setScreen("off-validation-two");
+          setScreen("off-spacious");
         },
       });
       break;
-    case "off-validation-two":
-      renderDelayedContinueScreen({
+    case "off-spacious":
+      renderStayScreen({
         label: "CHECK IN",
-        main: state.promptCopy.offValidationTwo,
-        buttonLabel: "Keep going",
-        onContinue: () => setScreen("off-grounding"),
+        reflectionLine: getQuietReflectionLine(
+          state.entry.deeperReflection || state.entry.mainResponse,
+          state.promptCopy.offReflectionFallback
+        ),
+        lead: "I can stay here for a minute.",
+        main: state.promptCopy.offSpaciousPrompt,
+        value: "",
+        buttonText: "Keep sitting with this",
+        secondaryButtonText: "I want to zoom out a little",
+        supportText: "",
+        onPrimary: (value) => {
+          state.entry.spaciousReflection = value.trim();
+          state.entry.stayLoopCount = 1;
+          setScreen("off-more");
+        },
+        onSecondary: (value) => {
+          state.entry.spaciousReflection = value.trim();
+          setScreen("off-grounding");
+        },
       });
       break;
     case "off-grounding":
@@ -275,21 +240,59 @@ function renderCheckIn() {
       renderInputScreen({
         label: "CHECK IN",
         main: state.promptCopy.offPerspectivePrompt,
-        value: state.entry.perspectiveReflection,
+        value: "",
         onSubmit: (value) => {
-          state.entry.perspectiveReflection = value.trim();
-          setScreen("off-clearer");
+          state.entry.perspectiveReflection = appendReflection(state.entry.perspectiveReflection, value.trim());
+          setScreen("off-continuation");
         },
       });
       break;
-    case "off-clearer":
+    case "off-continuation":
       renderLandingScreen({
         label: "CHECK IN",
-        main: "Does this feel a little clearer, or is there more here?",
+        main: "Where am I now with this?",
         primaryLabel: "This feels clearer",
         secondaryLabel: "There’s more",
-        onPrimary: () => finishCheckIn("closing", state.promptCopy.offClosing),
-        onSecondary: loopCheckIn,
+        onPrimary: () => {
+          state.entry.closingLine = state.promptCopy.offClosing;
+          setScreen("session-tags");
+        },
+        onSecondary: () => setScreen("off-more"),
+      });
+      break;
+    case "off-more":
+      renderStayScreen({
+        label: "CHECK IN",
+        reflectionLine: getQuietReflectionLine(
+          getMostRecentOffEntryText(state.entry),
+          state.promptCopy.offReflectionFallback
+        ),
+        main: state.promptCopy.offMorePrompt,
+        value: "",
+        supportText: "What’s coming up now?",
+        buttonText: "Keep sitting with this",
+        secondaryButtonText: "I want some perspective",
+        onPrimary: (value) => {
+          state.entry.continuationReflection = appendReflection(
+            state.entry.continuationReflection,
+            value.trim()
+          );
+          if (state.entry.stayLoopCount >= 2) {
+            setScreen("off-grounding");
+            return;
+          }
+
+          state.entry.stayLoopCount += 1;
+          state.promptCopy = createPromptCopy(state.promptCopy);
+          setScreen("off-more");
+        },
+        onSecondary: (value) => {
+          state.entry.continuationReflection = appendReflection(
+            state.entry.continuationReflection,
+            value.trim()
+          );
+          setScreen("off-grounding");
+        },
       });
       break;
     case "good-main":
@@ -331,7 +334,24 @@ function renderCheckIn() {
         value: state.entry.rememberLine,
         onSubmit: (value) => {
           state.entry.rememberLine = value.trim();
-          finishCheckIn("closing", state.promptCopy.goodClosing);
+          state.entry.closingLine = state.promptCopy.goodClosing;
+          setScreen("session-tags");
+        },
+      });
+      break;
+    case "session-tags":
+      renderTagScreen({
+        label: "CHECK IN",
+        main: "Anything I want to mark?",
+        subtext: "Only if it helps.",
+        selections: state.entry.contextTags,
+        onSubmit: (selections) => {
+          state.entry.contextTags = selections;
+          finishCheckIn("closing", state.entry.closingLine);
+        },
+        onSkip: () => {
+          state.entry.contextTags = [];
+          finishCheckIn("closing", state.entry.closingLine);
         },
       });
       break;
@@ -522,6 +542,106 @@ function renderBodyLocationScreen({ label, main, subtext = "", selections, note,
   });
 }
 
+function renderTagScreen({ label, main, subtext = "", selections, onSubmit, onSkip }) {
+  checkinCard.innerHTML = `
+    <form id="tag-form">
+      <div class="question">
+        <p class="eyebrow">${escapeHtml(label)}</p>
+        <h2>${escapeHtml(main)}</h2>
+        ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
+      </div>
+      <div class="chip-group">
+        ${CONTEXT_TAGS.map(
+          (tag) => `
+            <button
+              class="chip-button${selections.includes(tag) ? " is-selected" : ""}"
+              type="button"
+              data-tag-value="${escapeAttribute(tag)}"
+            >
+              ${escapeHtml(tag)}
+            </button>
+          `
+        ).join("")}
+      </div>
+      <div class="actions">
+        <button class="button button-quiet" type="button" id="tag-skip">Skip</button>
+        <button class="button button-primary" type="submit">Continue</button>
+      </div>
+    </form>
+  `;
+
+  const selected = new Set(selections);
+
+  document.querySelectorAll("[data-tag-value]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const value = button.dataset.tagValue;
+      if (selected.has(value)) {
+        selected.delete(value);
+      } else {
+        selected.add(value);
+      }
+      button.classList.toggle("is-selected", selected.has(value));
+    });
+  });
+
+  document.querySelector("#tag-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    onSubmit([...selected]);
+  });
+
+  document.querySelector("#tag-skip").addEventListener("click", onSkip);
+}
+
+function renderStayScreen({
+  label,
+  reflectionLine = "",
+  lead = "",
+  main,
+  supportText = "",
+  value,
+  buttonText,
+  secondaryButtonText,
+  onPrimary,
+  onSecondary,
+}) {
+  checkinCard.innerHTML = `
+    <form id="stay-form">
+      <div class="question">
+        <p class="eyebrow">${escapeHtml(label)}</p>
+        ${reflectionLine ? `<p class="muted support-line">${escapeHtml(reflectionLine)}</p>` : ""}
+        ${lead ? `<p class="muted support-line">${escapeHtml(lead)}</p>` : ""}
+        <h2>${escapeHtml(main)}</h2>
+        ${supportText ? `<p class="muted support-line">${escapeHtml(supportText)}</p>` : ""}
+      </div>
+      <textarea
+        id="stay-input"
+        class="text-input"
+      >${escapeHtml(value)}</textarea>
+      <div class="choice-group">
+        <button class="button button-secondary" type="button" id="stay-secondary">
+          ${escapeHtml(secondaryButtonText)}
+        </button>
+        <button class="button button-primary" type="submit">
+          ${escapeHtml(buttonText)}
+        </button>
+      </div>
+    </form>
+  `;
+
+  const form = document.querySelector("#stay-form");
+  const input = document.querySelector("#stay-input");
+  input.focus();
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    onPrimary(input.value);
+  });
+
+  document.querySelector("#stay-secondary").addEventListener("click", () => {
+    onSecondary(input.value);
+  });
+}
+
 function renderPauseScreen({
   label,
   main = "",
@@ -688,58 +808,45 @@ function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
 }
 
 function renderThreads() {
-  const entries = getEntries();
-  const calendar = buildCalendar(entries, new Date());
-  const selectedDate = resolveSelectedPatternDate(entries, calendar);
-  const selectedEntries = getEntriesForDate(entries, selectedDate);
-  const patternLines = buildInnerPatternLines(entries, selectedEntries);
+  const entries = getEntriesNewestFirst();
 
   threadsContent.innerHTML = `
-    <div class="insight-card">
-      <div class="calendar-shell" aria-label="A simple calendar view of saved check-ins">
-        <div class="calendar-header">
-          <h3>${escapeHtml(calendar.monthLabel)}</h3>
-          <p class="muted">A few days stand out.</p>
-        </div>
-        <div class="calendar-weekdays">
-          ${calendar.weekdays
-            .map(
-              (day) => `
-                <span class="muted calendar-weekday">${escapeHtml(day)}</span>
-              `
-            )
-            .join("")}
-        </div>
-        <div class="calendar-grid">
-          ${calendar.days.map(renderCalendarDay).join("")}
-        </div>
-      </div>
-    </div>
-    <div class="insight-card">
-      ${renderPatternDayCard(selectedDate, selectedEntries)}
-    </div>
-    <div class="insight-card">
-      <h3>This shows up in me</h3>
-      <div class="pattern-lines">
-        ${patternLines
-          .map((line) => `<p class="muted">${escapeHtml(line)}</p>`)
-          .join("")}
-      </div>
-    </div>
+    ${
+      entries.length
+        ? `
+          <div class="session-log-list">
+            ${entries.map(renderSessionLogCard).join("")}
+          </div>
+          <div class="session-log-actions">
+            <button class="button button-quiet session-log-clear" type="button" id="clear-session-log">
+              Clear session log
+            </button>
+          </div>
+        `
+        : `
+          <div class="session-log-empty">
+            <h3>No sessions saved yet.</h3>
+            <p class="muted">When I check in, a quiet record will appear here.</p>
+          </div>
+        `
+    }
   `;
 
-  document.querySelectorAll("[data-pattern-date]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.selectedPatternDate = button.dataset.patternDate;
-      renderThreads();
+  const clearButton = document.querySelector("#clear-session-log");
+  if (clearButton) {
+    clearButton.addEventListener("click", () => {
+      if (window.confirm("Clear all saved sessions?")) {
+        localStorage.removeItem(STORAGE_KEY);
+        renderThreads();
+      }
     });
-  });
+  }
 }
 
 function finishCheckIn(closingScreen = "closing", closingLine = "") {
   const extractedKeywords = extractKeywordsForEntry(state.entry);
   state.entry.extractedKeywords = extractedKeywords;
-  state.entry.closingAffirmation = selectAffirmation(extractedKeywords);
+  state.entry.closingAffirmation = "";
   state.entry.closingLine = closingLine || state.promptCopy.offClosing;
   saveEntry();
   state.screen = closingScreen;
@@ -766,19 +873,7 @@ function resetFlow() {
 
 function saveEntry() {
   const entries = getEntries();
-  entries.unshift({
-    timestamp: new Date().toISOString(),
-    entryType: state.entry.entryType,
-    mainResponse: state.entry.mainResponse,
-    bodyLocations: state.entry.bodyLocations,
-    bodyNote: state.entry.bodyNote,
-    deeperReflection: state.entry.deeperReflection,
-    perspectiveReflection: state.entry.perspectiveReflection,
-    rememberLine: state.entry.rememberLine,
-    closingLine: state.entry.closingLine,
-    closingAffirmation: state.entry.closingAffirmation,
-    extractedKeywords: state.entry.extractedKeywords,
-  });
+  entries.push(buildSavedSession());
   localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
 }
 
@@ -791,13 +886,123 @@ function getEntries() {
   }
 }
 
+function getEntriesNewestFirst() {
+  return [...getEntries()].sort((a, b) => {
+    const aTime = new Date(a.timestamp || 0).getTime();
+    const bTime = new Date(b.timestamp || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
+function buildSavedSession() {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: state.entry.id || createSessionId(),
+    timestamp,
+    entryType: state.entry.entryType,
+    entryTypeLabel: getEntryTypeLabel(state.entry.entryType),
+    mainResponse: state.entry.mainResponse,
+    bodyLocations: state.entry.bodyLocations,
+    bodyNote: state.entry.bodyNote,
+    contextTags: state.entry.contextTags,
+    deeperReflection: state.entry.deeperReflection,
+    spaciousReflection: state.entry.spaciousReflection,
+    perspectiveReflection: state.entry.perspectiveReflection,
+    continuationReflection: state.entry.continuationReflection,
+    rememberLine: state.entry.rememberLine,
+    closingLine: state.entry.closingLine,
+    sessionSummary: buildSessionExcerpt(state.entry),
+    extractedKeywords: state.entry.extractedKeywords,
+  };
+}
+
+function renderSessionLogCard(entry) {
+  const bodyLine = (entry.bodyLocations || []).length
+    ? `Body: ${entry.bodyLocations.join(", ")}`
+    : "";
+  const tagsLine = (entry.contextTags || []).length
+    ? `Tags: ${entry.contextTags.join(", ")}`
+    : "";
+  const finalLine = entry.rememberLine || entry.closingLine || "";
+
+  return `
+    <article class="session-log-card" data-session-id="${escapeAttribute(entry.id || "")}">
+      <p class="eyebrow">${escapeHtml(formatSessionTimestamp(entry.timestamp))}</p>
+      <h3>${escapeHtml(entry.entryTypeLabel || getEntryTypeLabel(entry.entryType))}</h3>
+      <p>${escapeHtml(entry.sessionSummary || buildSessionExcerpt(entry))}</p>
+      ${bodyLine ? `<p class="muted">${escapeHtml(bodyLine)}</p>` : ""}
+      ${tagsLine ? `<p class="muted">${escapeHtml(tagsLine)}</p>` : ""}
+      ${finalLine ? `<p class="muted">I noticed: ${escapeHtml(shortenText(finalLine, 110))}</p>` : ""}
+    </article>
+  `;
+}
+
+function buildSessionExcerpt(entry) {
+  const primary = getPrimarySessionText(entry);
+
+  if (!primary) {
+    return "There wasn’t much written here, and that still counts.";
+  }
+
+  return shortenText(primary, 180);
+}
+
+function getPrimarySessionText(entry) {
+  if ((entry.entryType || "off") === "good") {
+    return (
+      entry.rememberLine ||
+      entry.mainResponse ||
+      entry.bodyNote ||
+      entry.closingLine ||
+      ""
+    );
+  }
+
+  return (
+    getLastReflectionChunk(entry.continuationReflection) ||
+    getLastReflectionChunk(entry.spaciousReflection) ||
+    getLastReflectionChunk(entry.deeperReflection) ||
+    getLastReflectionChunk(entry.perspectiveReflection) ||
+    entry.mainResponse ||
+    entry.bodyNote ||
+    entry.closingLine ||
+    ""
+  );
+}
+
+function getEntryTypeLabel(entryType = "") {
+  return entryType === "good" ? "Something felt good" : "Something felt off";
+}
+
+function formatSessionTimestamp(timestamp) {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function createSessionId() {
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function collectEntryTexts(entry) {
   return [
     entry.mainResponse || entry.openingReflection || entry.firstReflection,
     (entry.bodyLocations || []).join(" "),
     entry.bodyNote,
     entry.deeperReflection || entry.situationBothering,
+    entry.spaciousReflection,
     entry.perspectiveReflection || entry.situationPerspective || entry.situationClearer,
+    entry.continuationReflection,
     entry.rememberLine,
     entry.closingLine,
   ].filter(Boolean);
@@ -807,16 +1012,85 @@ function extractKeywordsForEntry(entry) {
   return [...new Set(normalizeTokens(collectEntryTexts(entry).join(" ")))];
 }
 
-function selectAffirmation(keywords) {
-  const keywordSet = new Set(keywords);
+function appendReflection(existing = "", next = "") {
+  const trimmedNext = next.trim();
 
-  for (const affirmation of AFFIRMATIONS) {
-    if (affirmation.keywords.some((keyword) => keywordSet.has(keyword))) {
-      return affirmation.text;
+  if (!trimmedNext) {
+    return existing;
+  }
+
+  return existing ? `${existing}\n\n${trimmedNext}` : trimmedNext;
+}
+
+function getMostRecentOffEntryText(entry) {
+  const values = [
+    getLastReflectionChunk(entry.continuationReflection),
+    getLastReflectionChunk(entry.spaciousReflection),
+    getLastReflectionChunk(entry.perspectiveReflection),
+    entry.deeperReflection,
+    entry.mainResponse,
+  ];
+
+  return values.find((value) => value && value.trim()) || "";
+}
+
+function getLastReflectionChunk(text = "") {
+  const chunks = text
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  return chunks.length ? chunks[chunks.length - 1] : "";
+}
+
+function getQuietReflectionLine(sourceText = "", fallback = "There’s room here.") {
+  const mirrored = buildMirroredPhrase(sourceText);
+  return mirrored || fallback;
+}
+
+function buildMirroredPhrase(text = "") {
+  const trimmed = text.replace(/\s+/g, " ").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const clause = extractInitialClause(trimmed);
+  const words = clause.split(/\s+/).filter(Boolean);
+
+  if (words.length < 3) {
+    return "";
+  }
+
+  const limited = words.slice(0, 8).join(" ").replace(/[,:;]+$/g, "");
+  const normalized = limited.charAt(0).toUpperCase() + limited.slice(1);
+  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
+}
+
+function extractInitialClause(text = "") {
+  const breakPatterns = [
+    /\.\s/,
+    /!\s/,
+    /\?\s/,
+    /\n/,
+    /,\s/,
+    /;\s/,
+    /\sand\s/i,
+    /\sbut\s/i,
+    /\sbecause\s/i,
+  ];
+
+  let clause = text;
+
+  for (const pattern of breakPatterns) {
+    const match = clause.match(pattern);
+    if (match && match.index >= 12) {
+      clause = clause.slice(0, match.index);
+      break;
     }
   }
 
-  return "I checked in. That matters.";
+  return clause.trim();
 }
 
 function loopCheckIn() {
@@ -825,7 +1099,10 @@ function loopCheckIn() {
   state.entry.bodyLocations = [];
   state.entry.bodyNote = "";
   state.entry.deeperReflection = "";
+  state.entry.spaciousReflection = "";
   state.entry.perspectiveReflection = "";
+  state.entry.continuationReflection = "";
+  state.entry.stayLoopCount = 0;
   if (state.entry.loopCount % 2 === 1) {
     setScreen("off-body");
     return;
@@ -987,22 +1264,25 @@ function renderPatternDayCard(selectedDate, entries) {
   return `
     <div class="pattern-day-card">
       <p class="eyebrow">${escapeHtml(dayLabel)}</p>
-      <h3>${escapeHtml(summary.topLine)}</h3>
+      <h3>${escapeHtml(summary.entryTypeLabel)}</h3>
       <div class="pattern-day-sections">
         <div class="pattern-day-section">
-          <p class="eyebrow">${escapeHtml(summary.entryTypeLabel)}</p>
           <p>${escapeHtml(summary.mainResponse)}</p>
         </div>
-        <div class="pattern-day-section">
-          <p class="eyebrow">Where I Noticed It</p>
-          <p>${escapeHtml(summary.bodyLine)}</p>
-        </div>
         ${
-          summary.remembered
+          summary.bodyLine
             ? `
               <div class="pattern-day-section">
-                <p class="eyebrow">${escapeHtml(summary.rememberedLabel)}</p>
-                <p>${escapeHtml(summary.remembered)}</p>
+                <p class="muted">I noticed this in ${escapeHtml(summary.bodyLine)}.</p>
+              </div>
+            `
+            : ""
+        }
+        ${
+          summary.noticedLine
+            ? `
+              <div class="pattern-day-section">
+                <p class="muted">I noticed: ${escapeHtml(summary.noticedLine)}</p>
               </div>
             `
             : ""
@@ -1013,27 +1293,15 @@ function renderPatternDayCard(selectedDate, entries) {
 }
 
 function buildDaySummary(entries, selectedDate) {
-  const topLines = [
-    "Something in me was active here.",
-    "I noticed something in me on this day.",
-    "I had something worth listening to here.",
-    "There was something here worth noticing.",
-  ];
-  const topLine = topLines[hashString(selectedDate) % topLines.length];
   const latestEntry = entries[0];
-  const bodyBits = [
-    ...(latestEntry.bodyLocations || []),
-    latestEntry.bodyNote,
-  ].filter(Boolean);
-  const remembered = latestEntry.rememberLine || latestEntry.perspectiveReflection || latestEntry.closingLine;
+  const bodyBits = (latestEntry.bodyLocations || []).filter(Boolean);
+  const noticedLine = getPatternNoticedLine(latestEntry);
 
   return {
-    topLine,
-    entryTypeLabel: latestEntry.entryType === "good" ? "Something Felt Good" : "Something Felt Off",
+    entryTypeLabel: latestEntry.entryType === "good" ? "Something felt good" : "Something felt off",
     mainResponse: shortenText(latestEntry.mainResponse || "There wasn’t much written here, and that still counts."),
-    bodyLine: bodyBits.length ? shortenText(bodyBits.join(", "), 110) : "I didn’t name a place here, but something was still there.",
-    remembered,
-    rememberedLabel: latestEntry.entryType === "good" ? "What I Want To Remember" : "What Shifted",
+    bodyLine: bodyBits.length ? shortenText(bodyBits.join(", "), 80) : "",
+    noticedLine,
   };
 }
 
@@ -1042,27 +1310,68 @@ function buildInnerPatternLines(entries, selectedEntries) {
     return ["Patterns will appear gently as more check-ins are saved."];
   }
 
-  const repeatedWords = getRepeatedKeywords(entries, 3);
-  const recentThemes = getTopTerms(entries.flatMap((entry) => collectEntryTexts(entry)), 4);
+  const bodyCounts = getBodyLocationCounts(entries);
+  const repeatedBody = [...bodyCounts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const hasOlderLanguage = entries.some((entry) =>
+    [entry.deeperReflection, entry.spaciousReflection, entry.continuationReflection]
+      .filter(Boolean)
+      .some((text) => /\b(older|old|familiar)\b/i.test(text))
+  );
+  const hasGood = entries.some((entry) => entry.entryType === "good");
+  const hasOff = entries.some((entry) => (entry.entryType || "off") === "off");
+  const repeatedWords = getRepeatedKeywords(entries, 2);
   const lines = [];
 
-  if (repeatedWords[0] || recentThemes[0]) {
-    lines.push("This feeling has shown up more than once.");
+  if (repeatedBody && repeatedBody[1] > 1) {
+    lines.push(`${capitalize(repeatedBody[0])} has come up more than once.`);
   }
 
-  if (repeatedWords[1]) {
-    lines.push(`This seems connected to ${repeatedWords[1]}.`);
-  } else if (recentThemes[0]) {
-    lines.push(`I’ve met something like this around ${recentThemes[0]} before.`);
+  if (hasOlderLanguage) {
+    lines.push("Older or familiar has shown up recently.");
   }
 
-  if (selectedEntries.length && repeatedWords[0]) {
-    lines.push("This isn’t the first time this has come up.");
-  } else if (recentThemes[1]) {
-    lines.push(`Something in me tends to get louder around ${recentThemes[1]}.`);
+  if (hasGood && hasOff) {
+    lines.push("Good moments are being recorded too.");
+  }
+
+  if (!lines.length && selectedEntries.length && repeatedWords[0]) {
+    lines.push("This feeling has visited before.");
+  }
+
+  if (!lines.length && repeatedWords[0]) {
+    lines.push("Something here has come around before.");
   }
 
   return lines.length ? lines.slice(0, 3) : ["Patterns will appear gently as more check-ins are saved."];
+}
+
+function getPatternNoticedLine(entry) {
+  const value =
+    getLastReflectionChunk(entry.rememberLine) ||
+    getLastReflectionChunk(entry.perspectiveReflection) ||
+    getLastReflectionChunk(entry.continuationReflection) ||
+    getLastReflectionChunk(entry.spaciousReflection) ||
+    getLastReflectionChunk(entry.deeperReflection) ||
+    "";
+
+  return value ? shortenText(value, 100) : "";
+}
+
+function getBodyLocationCounts(entries) {
+  const counts = new Map();
+
+  entries.forEach((entry) => {
+    (entry.bodyLocations || []).forEach((location) => {
+      const normalized = location.trim().toLowerCase();
+      if (!normalized) {
+        return;
+      }
+
+      counts.set(normalized, (counts.get(normalized) || 0) + 1);
+    });
+  });
+
+  return counts;
 }
 
 function formatDateKey(year, month, day) {
