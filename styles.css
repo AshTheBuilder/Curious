@@ -320,6 +320,27 @@ h2 {
   margin-top: 10px;
 }
 
+.text-input-notice {
+  min-height: 82px;
+  border-color: rgba(141, 132, 122, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.stay-heading-quiet {
+  font-size: 1.28rem;
+  line-height: 1.45;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.eyebrow-quiet {
+  margin-bottom: 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  opacity: 0.72;
+}
+
 .stillness {
   margin-top: 14px;
   padding: 14px 16px;

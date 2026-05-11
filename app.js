@@ -3,21 +3,6 @@ const checkinCard = document.querySelector("#checkin-card");
 const threadsContent = document.querySelector("#threads-content");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
-const CONTEXT_TAGS = [
-  "hormones may be part of this",
-  "relationship",
-  "work",
-  "family",
-  "kids",
-  "grief",
-  "money",
-  "body",
-  "old feeling",
-  "new feeling",
-  "tired",
-  "good moment",
-];
-
 const FLOW_VARIANTS = {
   offDeeperPrompt: [
     "Does this feel new or older?",
@@ -92,13 +77,14 @@ function createEmptyEntry() {
     mainResponse: "",
     bodyLocations: [],
     bodyNote: "",
-    contextTags: [],
     deeperReflection: "",
     spaciousReflection: "",
     perspectiveReflection: "",
+    offContextReflection: "",
     continuationReflection: "",
     stayLoopCount: 0,
     rememberLine: "",
+    goodContinuityReflection: "",
     loopCount: 0,
     sessionSummary: "",
     closingLine: "",
@@ -206,25 +192,21 @@ function renderCheckIn() {
       break;
     case "off-spacious":
       renderStayScreen({
-        label: "CHECK IN",
-        reflectionLine: getQuietReflectionLine(
-          state.entry.deeperReflection || state.entry.mainResponse,
-          state.promptCopy.offReflectionFallback
-        ),
-        lead: "I can stay here for a minute.",
+        label: "",
         main: state.promptCopy.offSpaciousPrompt,
         value: "",
-        buttonText: "Keep sitting with this",
-        secondaryButtonText: "I want to zoom out a little",
+        buttonText: "Continue",
+        secondaryButtonText: "Stay here",
         supportText: "",
+        inputClassName: "text-input-notice",
         onPrimary: (value) => {
           state.entry.spaciousReflection = value.trim();
-          state.entry.stayLoopCount = 1;
-          setScreen("off-more");
+          setScreen("off-grounding");
         },
         onSecondary: (value) => {
           state.entry.spaciousReflection = value.trim();
-          setScreen("off-grounding");
+          state.entry.stayLoopCount = 1;
+          setScreen("off-more");
         },
       });
       break;
@@ -255,24 +237,40 @@ function renderCheckIn() {
         secondaryLabel: "There’s more",
         onPrimary: () => {
           state.entry.closingLine = state.promptCopy.offClosing;
-          setScreen("session-tags");
+          setScreen("off-connected");
         },
         onSecondary: () => setScreen("off-more"),
       });
       break;
+    case "off-connected":
+      renderInputScreen({
+        label: "CHECK IN",
+        main: "What feels connected to this?",
+        value: "",
+        onSubmit: (value) => {
+          state.entry.offContextReflection = value.trim();
+          finishCheckIn("closing", state.entry.closingLine);
+        },
+      });
+      break;
     case "off-more":
       renderStayScreen({
-        label: "CHECK IN",
-        reflectionLine: getQuietReflectionLine(
-          getMostRecentOffEntryText(state.entry),
-          state.promptCopy.offReflectionFallback
-        ),
-        main: state.promptCopy.offMorePrompt,
+        label: "",
+        main: "There’s more here I’m curious about.",
         value: "",
-        supportText: "What’s coming up now?",
-        buttonText: "Keep sitting with this",
-        secondaryButtonText: "I want some perspective",
+        supportText: "",
+        inputClassName: "text-input-notice",
+        mainClassName: "stay-heading-quiet",
+        buttonText: "Continue",
+        secondaryButtonText: "Stay here",
         onPrimary: (value) => {
+          state.entry.continuationReflection = appendReflection(
+            state.entry.continuationReflection,
+            value.trim()
+          );
+          setScreen("off-grounding");
+        },
+        onSecondary: (value) => {
           state.entry.continuationReflection = appendReflection(
             state.entry.continuationReflection,
             value.trim()
@@ -285,13 +283,6 @@ function renderCheckIn() {
           state.entry.stayLoopCount += 1;
           state.promptCopy = createPromptCopy(state.promptCopy);
           setScreen("off-more");
-        },
-        onSecondary: (value) => {
-          state.entry.continuationReflection = appendReflection(
-            state.entry.continuationReflection,
-            value.trim()
-          );
-          setScreen("off-grounding");
         },
       });
       break;
@@ -334,23 +325,19 @@ function renderCheckIn() {
         value: state.entry.rememberLine,
         onSubmit: (value) => {
           state.entry.rememberLine = value.trim();
-          state.entry.closingLine = state.promptCopy.goodClosing;
-          setScreen("session-tags");
+          setScreen("good-continuity");
         },
       });
       break;
-    case "session-tags":
-      renderTagScreen({
+    case "good-continuity":
+      renderInputScreen({
         label: "CHECK IN",
-        main: "Anything I want to mark?",
-        subtext: "Only if it helps.",
-        selections: state.entry.contextTags,
-        onSubmit: (selections) => {
-          state.entry.contextTags = selections;
-          finishCheckIn("closing", state.entry.closingLine);
-        },
-        onSkip: () => {
-          state.entry.contextTags = [];
+        main: "When else have I felt this way?",
+        subtext: "This version of me has existed before.",
+        value: "",
+        onSubmit: (value) => {
+          state.entry.goodContinuityReflection = value.trim();
+          state.entry.closingLine = state.promptCopy.goodClosing;
           finishCheckIn("closing", state.entry.closingLine);
         },
       });
@@ -542,56 +529,6 @@ function renderBodyLocationScreen({ label, main, subtext = "", selections, note,
   });
 }
 
-function renderTagScreen({ label, main, subtext = "", selections, onSubmit, onSkip }) {
-  checkinCard.innerHTML = `
-    <form id="tag-form">
-      <div class="question">
-        <p class="eyebrow">${escapeHtml(label)}</p>
-        <h2>${escapeHtml(main)}</h2>
-        ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
-      </div>
-      <div class="chip-group">
-        ${CONTEXT_TAGS.map(
-          (tag) => `
-            <button
-              class="chip-button${selections.includes(tag) ? " is-selected" : ""}"
-              type="button"
-              data-tag-value="${escapeAttribute(tag)}"
-            >
-              ${escapeHtml(tag)}
-            </button>
-          `
-        ).join("")}
-      </div>
-      <div class="actions">
-        <button class="button button-quiet" type="button" id="tag-skip">Skip</button>
-        <button class="button button-primary" type="submit">Continue</button>
-      </div>
-    </form>
-  `;
-
-  const selected = new Set(selections);
-
-  document.querySelectorAll("[data-tag-value]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const value = button.dataset.tagValue;
-      if (selected.has(value)) {
-        selected.delete(value);
-      } else {
-        selected.add(value);
-      }
-      button.classList.toggle("is-selected", selected.has(value));
-    });
-  });
-
-  document.querySelector("#tag-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    onSubmit([...selected]);
-  });
-
-  document.querySelector("#tag-skip").addEventListener("click", onSkip);
-}
-
 function renderStayScreen({
   label,
   reflectionLine = "",
@@ -599,6 +536,8 @@ function renderStayScreen({
   main,
   supportText = "",
   value,
+  inputClassName = "",
+  mainClassName = "",
   buttonText,
   secondaryButtonText,
   onPrimary,
@@ -607,15 +546,15 @@ function renderStayScreen({
   checkinCard.innerHTML = `
     <form id="stay-form">
       <div class="question">
-        <p class="eyebrow">${escapeHtml(label)}</p>
+        ${label ? `<p class="eyebrow eyebrow-quiet">${escapeHtml(label)}</p>` : ""}
         ${reflectionLine ? `<p class="muted support-line">${escapeHtml(reflectionLine)}</p>` : ""}
         ${lead ? `<p class="muted support-line">${escapeHtml(lead)}</p>` : ""}
-        <h2>${escapeHtml(main)}</h2>
+        <h2 class="${escapeAttribute(mainClassName)}">${escapeHtml(main)}</h2>
         ${supportText ? `<p class="muted support-line">${escapeHtml(supportText)}</p>` : ""}
       </div>
       <textarea
         id="stay-input"
-        class="text-input"
+        class="text-input ${escapeAttribute(inputClassName)}"
       >${escapeHtml(value)}</textarea>
       <div class="choice-group">
         <button class="button button-secondary" type="button" id="stay-secondary">
@@ -905,12 +844,13 @@ function buildSavedSession() {
     mainResponse: state.entry.mainResponse,
     bodyLocations: state.entry.bodyLocations,
     bodyNote: state.entry.bodyNote,
-    contextTags: state.entry.contextTags,
     deeperReflection: state.entry.deeperReflection,
     spaciousReflection: state.entry.spaciousReflection,
     perspectiveReflection: state.entry.perspectiveReflection,
+    offContextReflection: state.entry.offContextReflection,
     continuationReflection: state.entry.continuationReflection,
     rememberLine: state.entry.rememberLine,
+    goodContinuityReflection: state.entry.goodContinuityReflection,
     closingLine: state.entry.closingLine,
     sessionSummary: buildSessionExcerpt(state.entry),
     extractedKeywords: state.entry.extractedKeywords,
@@ -924,7 +864,12 @@ function renderSessionLogCard(entry) {
   const tagsLine = (entry.contextTags || []).length
     ? `Tags: ${entry.contextTags.join(", ")}`
     : "";
-  const finalLine = entry.rememberLine || entry.closingLine || "";
+  const finalLine =
+    entry.goodContinuityReflection ||
+    entry.offContextReflection ||
+    entry.rememberLine ||
+    entry.closingLine ||
+    "";
 
   return `
     <article class="session-log-card" data-session-id="${escapeAttribute(entry.id || "")}">
@@ -951,6 +896,7 @@ function buildSessionExcerpt(entry) {
 function getPrimarySessionText(entry) {
   if ((entry.entryType || "off") === "good") {
     return (
+      entry.goodContinuityReflection ||
       entry.rememberLine ||
       entry.mainResponse ||
       entry.bodyNote ||
@@ -960,6 +906,7 @@ function getPrimarySessionText(entry) {
   }
 
   return (
+    getLastReflectionChunk(entry.offContextReflection) ||
     getLastReflectionChunk(entry.continuationReflection) ||
     getLastReflectionChunk(entry.spaciousReflection) ||
     getLastReflectionChunk(entry.deeperReflection) ||
@@ -1002,8 +949,10 @@ function collectEntryTexts(entry) {
     entry.deeperReflection || entry.situationBothering,
     entry.spaciousReflection,
     entry.perspectiveReflection || entry.situationPerspective || entry.situationClearer,
+    entry.offContextReflection,
     entry.continuationReflection,
     entry.rememberLine,
+    entry.goodContinuityReflection,
     entry.closingLine,
   ].filter(Boolean);
 }
@@ -1101,7 +1050,9 @@ function loopCheckIn() {
   state.entry.deeperReflection = "";
   state.entry.spaciousReflection = "";
   state.entry.perspectiveReflection = "";
+  state.entry.offContextReflection = "";
   state.entry.continuationReflection = "";
+  state.entry.goodContinuityReflection = "";
   state.entry.stayLoopCount = 0;
   if (state.entry.loopCount % 2 === 1) {
     setScreen("off-body");
