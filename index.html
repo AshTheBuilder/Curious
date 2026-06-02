@@ -12,7 +12,7 @@
         <div class="brand-lockup">
           <div class="brand-arch" aria-hidden="true">
             <svg viewBox="0 0 120 180" role="presentation">
-              <path d="M24 156V70C24 33.549 40.118 12 60 12C79.882 12 96 33.549 96 70V156" />
+              <path d="M14 128V88C14 50.445 34.147 24 60 24C85.853 24 106 50.445 106 88V128" />
             </svg>
           </div>
           <h1 class="brand-title">Curious</h1>
@@ -46,6 +46,46 @@
           </div>
         </section>
       </main>
+
+      <footer class="app-footer">
+        <p class="footer-note">A space to notice — not a substitute for therapy or crisis care.</p>
+        <button class="inline-link footer-support" type="button" id="support-trigger">
+          Need support now?
+        </button>
+      </footer>
+    </div>
+
+    <div class="support-overlay" id="support-overlay" role="dialog" aria-modal="true" aria-labelledby="support-title">
+      <div class="support-dialog">
+        <p class="eyebrow">Support</p>
+        <h2 id="support-title">If I need a person right now</h2>
+        <p class="muted support-line">I don’t have to be in crisis to reach out. These are free, confidential, and open any time.</p>
+        <ul class="support-list">
+          <li>
+            <a class="support-resource" href="tel:988">Call 988</a>
+            <span class="support-resource-note">Suicide &amp; Crisis Lifeline (US) — call, available 24/7</span>
+          </li>
+          <li>
+            <a class="support-resource" href="sms:988">Text 988</a>
+            <span class="support-resource-note">Same Lifeline, by text</span>
+          </li>
+          <li>
+            <a class="support-resource" href="sms:741741?&body=HOME">Text HOME to 741741</a>
+            <span class="support-resource-note">Crisis Text Line (US)</span>
+          </li>
+          <li>
+            <a class="support-resource" href="tel:911">Call 911</a>
+            <span class="support-resource-note">If I’m in immediate danger</span>
+          </li>
+          <li>
+            <a class="support-resource" href="https://findahelpline.com" target="_blank" rel="noopener noreferrer">findahelpline.com</a>
+            <span class="support-resource-note">Free helplines outside the US, by country</span>
+          </li>
+        </ul>
+        <div class="actions">
+          <button class="button button-primary" type="button" id="support-close">Close</button>
+        </div>
+      </div>
     </div>
 
     <script src="./app.js"></script>

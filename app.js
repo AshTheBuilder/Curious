@@ -3,7 +3,16 @@ const checkinCard = document.querySelector("#checkin-card");
 const threadsContent = document.querySelector("#threads-content");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
+const supportOverlay = document.querySelector("#support-overlay");
+const supportClose = document.querySelector("#support-close");
+const supportTrigger = document.querySelector("#support-trigger");
+
 const FLOW_VARIANTS = {
+  offArrive: [
+    "Feet on the floor. One slow breath. The room is still here.",
+    "I can feel where I’m sitting. I have a minute.",
+    "Nothing has to happen fast. I’m only arriving.",
+  ],
   offDeeperPrompt: [
     "Does this feel new or older?",
     "What feels stirred up from this?",
@@ -18,6 +27,11 @@ const FLOW_VARIANTS = {
     "I don’t need to rush this",
     "There’s room for this",
     "I can notice this without following it",
+  ],
+  offSteady: [
+    "I can let this be big and still be okay.",
+    "I don’t have to carry all of it right now.",
+    "It makes sense that this is a lot.",
   ],
   offPerspectivePrompt: [
     "Where am I now with this?",
@@ -54,9 +68,6 @@ const FLOW_VARIANTS = {
 const state = {
   activeTab: "checkin",
   screen: "opening",
-  pauseMessage: "",
-  delayedRevealReady: false,
-  selectedPatternDate: "",
   promptCopy: createPromptCopy(),
   entry: createEmptyEntry(),
 };
@@ -67,8 +78,28 @@ tabButtons.forEach((button) => {
   });
 });
 
+if (supportTrigger) {
+  supportTrigger.addEventListener("click", openResources);
+}
+if (supportClose) {
+  supportClose.addEventListener("click", closeResources);
+}
+if (supportOverlay) {
+  supportOverlay.addEventListener("click", (event) => {
+    if (event.target === supportOverlay) {
+      closeResources();
+    }
+  });
+}
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeResources();
+  }
+});
+
 renderCheckIn();
 renderThreads();
+updateChromeState();
 
 function createEmptyEntry() {
   return {
@@ -77,27 +108,31 @@ function createEmptyEntry() {
     mainResponse: "",
     bodyLocations: [],
     bodyNote: "",
+    intensity: "",
     deeperReflection: "",
     spaciousReflection: "",
     perspectiveReflection: "",
     offContextReflection: "",
     continuationReflection: "",
     stayLoopCount: 0,
+    wantsReturnLater: false,
+    returnLine: "",
     rememberLine: "",
     goodContinuityReflection: "",
-    loopCount: 0,
+    bringToTherapy: false,
+    bringToTherapyLine: "",
     sessionSummary: "",
     closingLine: "",
-    closingAffirmation: "",
-    extractedKeywords: [],
   };
 }
 
 function createPromptCopy(previous = {}) {
   return {
+    offArrive: chooseVariant(FLOW_VARIANTS.offArrive, previous.offArrive),
     offDeeperPrompt: chooseVariant(FLOW_VARIANTS.offDeeperPrompt, previous.offDeeperPrompt),
     offSpaciousPrompt: chooseVariant(FLOW_VARIANTS.offSpaciousPrompt, previous.offSpaciousPrompt),
     offGrounding: chooseVariant(FLOW_VARIANTS.offGrounding, previous.offGrounding),
+    offSteady: chooseVariant(FLOW_VARIANTS.offSteady, previous.offSteady),
     offPerspectivePrompt: chooseVariant(FLOW_VARIANTS.offPerspectivePrompt, previous.offPerspectivePrompt),
     offMorePrompt: chooseVariant(FLOW_VARIANTS.offMorePrompt, previous.offMorePrompt),
     offClosing: chooseVariant(FLOW_VARIANTS.offClosing, previous.offClosing),
@@ -131,27 +166,36 @@ function setActiveTab(tabName) {
   if (tabName === "threads") {
     renderThreads();
   }
+
+  updateChromeState();
 }
 
 function renderCheckIn() {
+  checkinCard.classList.toggle("opening-shell", state.screen === "opening");
+  updateChromeState();
+
   switch (state.screen) {
     case "opening":
       renderOpeningScreen();
       break;
+
+    /* ---------- OFF PATH ---------- */
     case "off-intro":
       renderMessageScreen({
         label: "Notice",
         main: "Something feels off",
         buttonText: "I’m curious →",
-        onContinue: () => setScreen("off-main"),
+        onContinue: () => setScreen("off-arrive"),
       });
       break;
-    case "good-intro":
-      renderMessageScreen({
-        label: "Notice",
-        main: "Something feels good",
-        buttonText: "Stay here →",
-        onContinue: () => setScreen("good-main"),
+    case "off-arrive":
+      // Ground first. Establish a floor before looking at anything.
+      renderDelayedContinueScreen({
+        label: "Arrive",
+        main: "Let me land before I look.",
+        subtext: state.promptCopy.offArrive,
+        buttonLabel: "I’m here →",
+        onContinue: () => setScreen("off-main"),
       });
       break;
     case "off-main":
@@ -159,6 +203,7 @@ function renderCheckIn() {
         label: "Notice",
         main: "What’s here?",
         value: state.entry.mainResponse,
+        onEscape: () => setScreen("off-too-much"),
         onSubmit: (value) => {
           state.entry.mainResponse = value.trim();
           setScreen("off-body");
@@ -172,11 +217,46 @@ function renderCheckIn() {
         subtext: "No need to explain it yet. Just notice where it shows up.",
         selections: state.entry.bodyLocations,
         note: state.entry.bodyNote,
+        onEscape: () => setScreen("off-too-much"),
         onSubmit: ({ selections, note }) => {
           state.entry.bodyLocations = selections;
           state.entry.bodyNote = note.trim();
-          setScreen("off-deeper");
+          setScreen("off-intensity");
         },
+      });
+      break;
+    case "off-intensity":
+      // Titration gate. Read the size before choosing how far to go.
+      renderChoiceScreen({
+        label: "Notice",
+        main: "How big does this feel right now?",
+        subtext: "No wrong answer. Just a read.",
+        options: [
+          { label: "A flicker", value: "low" },
+          { label: "Noticeable", value: "mid" },
+          { label: "A lot", value: "high" },
+        ],
+        onEscape: () => setScreen("off-too-much"),
+        onSelect: (value) => {
+          state.entry.intensity = value;
+          if (value === "high") {
+            setScreen("off-stabilize");
+          } else {
+            setScreen("off-capacity");
+          }
+        },
+      });
+      break;
+    case "off-capacity":
+      // Explicit readiness check before any deepening.
+      renderLandingScreen({
+        label: "Listen",
+        main: "Do I have space to look a little closer — right now?",
+        primaryLabel: "Yes, I’m curious →",
+        secondaryLabel: "Not right now",
+        onEscape: () => setScreen("off-too-much"),
+        onPrimary: () => setScreen("off-deeper"),
+        onSecondary: () => setScreen("off-carry"),
       });
       break;
     case "off-deeper":
@@ -184,6 +264,7 @@ function renderCheckIn() {
         label: "Listen",
         main: state.promptCopy.offDeeperPrompt,
         value: "",
+        onEscape: () => setScreen("off-too-much"),
         onSubmit: (value) => {
           state.entry.deeperReflection = value.trim();
           setScreen("off-spacious");
@@ -199,6 +280,7 @@ function renderCheckIn() {
         secondaryButtonText: "Stay here",
         supportText: "",
         inputClassName: "text-input-notice",
+        onEscape: () => setScreen("off-too-much"),
         onPrimary: (value) => {
           state.entry.spaciousReflection = value.trim();
           setScreen("off-grounding");
@@ -215,6 +297,7 @@ function renderCheckIn() {
         label: "Stay Here",
         main: state.promptCopy.offGrounding,
         buttonLabel: "Continue →",
+        onEscape: () => setScreen("off-too-much"),
         onContinue: () => setScreen("off-perspective"),
       });
       break;
@@ -223,6 +306,7 @@ function renderCheckIn() {
         label: "Widen",
         main: state.promptCopy.offPerspectivePrompt,
         value: "",
+        onEscape: () => setScreen("off-too-much"),
         onSubmit: (value) => {
           state.entry.perspectiveReflection = appendReflection(state.entry.perspectiveReflection, value.trim());
           setScreen("off-continuation");
@@ -235,10 +319,8 @@ function renderCheckIn() {
         main: "Where am I now with this?",
         primaryLabel: "Continue →",
         secondaryLabel: "Stay here →",
-        onPrimary: () => {
-          state.entry.closingLine = state.promptCopy.offClosing;
-          setScreen("off-connected");
-        },
+        onEscape: () => setScreen("off-too-much"),
+        onPrimary: () => setScreen("off-connected"),
         onSecondary: () => setScreen("off-more"),
       });
       break;
@@ -247,9 +329,10 @@ function renderCheckIn() {
         label: "Tell Me More",
         main: "What feels connected to this?",
         value: "",
+        onEscape: () => setScreen("off-too-much"),
         onSubmit: (value) => {
           state.entry.offContextReflection = value.trim();
-          finishCheckIn("closing", state.entry.closingLine);
+          setScreen("off-carry");
         },
       });
       break;
@@ -263,6 +346,7 @@ function renderCheckIn() {
         mainClassName: "stay-heading-quiet",
         buttonText: "Continue",
         secondaryButtonText: "Stay here",
+        onEscape: () => setScreen("off-too-much"),
         onPrimary: (value) => {
           state.entry.continuationReflection = appendReflection(
             state.entry.continuationReflection,
@@ -284,6 +368,60 @@ function renderCheckIn() {
           state.promptCopy = createPromptCopy(state.promptCopy);
           setScreen("off-more");
         },
+      });
+      break;
+
+    /* ---------- HIGH-INTENSITY STABILIZING PATH ---------- */
+    case "off-stabilize":
+      renderMessageScreen({
+        label: "Steady",
+        main: "This is a lot. I don’t have to go further right now.",
+        subtext: state.promptCopy.offSteady,
+        buttonText: "Stay with me →",
+        includePulse: true,
+        showSupportLink: true,
+        onContinue: () => setScreen("off-stabilize-ground"),
+      });
+      break;
+    case "off-stabilize-ground":
+      renderDelayedContinueScreen({
+        label: "Steady",
+        main: state.promptCopy.offGrounding,
+        subtext: "Slow breath out. I’m still here. The hard part can wait for the room.",
+        buttonLabel: "Continue →",
+        showSupportLink: true,
+        onContinue: () => setScreen("off-carry"),
+      });
+      break;
+
+    /* ---------- INTEGRATION / BRIDGE TO THERAPY ---------- */
+    case "off-carry":
+      renderInputScreen({
+        label: "Carry",
+        main: "Is there anything here I want to bring to my next session?",
+        subtext: "A sentence is enough. It’ll be waiting in your log. (You can leave this blank.)",
+        value: state.entry.bringToTherapyLine,
+        placeholder: "",
+        onSubmit: (value) => {
+          const line = value.trim();
+          state.entry.bringToTherapyLine = line;
+          state.entry.bringToTherapy = Boolean(line);
+          state.entry.closingLine = state.promptCopy.offClosing;
+          finishCheckIn("closing", state.entry.closingLine);
+        },
+      });
+      break;
+    case "off-too-much":
+      renderTooMuchScreen();
+      break;
+
+    /* ---------- GOOD PATH ---------- */
+    case "good-intro":
+      renderMessageScreen({
+        label: "Notice",
+        main: "Something feels good",
+        buttonText: "Stay here →",
+        onContinue: () => setScreen("good-main"),
       });
       break;
     case "good-main":
@@ -342,6 +480,7 @@ function renderCheckIn() {
         },
       });
       break;
+
     case "closing":
       renderClosing({
         main: state.entry.closingLine,
@@ -355,11 +494,17 @@ function renderCheckIn() {
 
 function setScreen(screen) {
   state.screen = screen;
-  state.pauseMessage = "";
-  state.delayedRevealReady = false;
   checkinCard.classList.toggle("opening-shell", screen === "opening");
+  updateChromeState();
   renderCheckIn();
 }
+
+function updateChromeState() {
+  const shouldCompact = !(state.activeTab === "checkin" && state.screen === "opening");
+  document.body.classList.toggle("is-compact-brand", shouldCompact);
+}
+
+/* ---------- SCREENS ---------- */
 
 function renderOpeningScreen() {
   checkinCard.innerHTML = `
@@ -392,7 +537,9 @@ function renderMessageScreen({
   subtext = "",
   buttonText,
   onContinue,
+  onEscape = null,
   includePulse = false,
+  showSupportLink = false,
 }) {
   checkinCard.innerHTML = `
     <div class="support-copy">
@@ -400,6 +547,8 @@ function renderMessageScreen({
       ${main ? `<h2>${escapeHtml(main)}</h2>` : ""}
       ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
       ${includePulse ? renderPresenceDots() : ""}
+      ${showSupportLink ? renderInlineSupportLink() : ""}
+      ${renderTooMuchAction(onEscape)}
       <div class="actions">
         <button class="button button-primary" type="button" id="continue-button">${escapeHtml(buttonText)}</button>
       </div>
@@ -407,6 +556,8 @@ function renderMessageScreen({
   `;
 
   document.querySelector("#continue-button").addEventListener("click", onContinue);
+  bindTooMuchAction(onEscape);
+  bindInlineSupportLink();
 }
 
 function renderDelayedContinueScreen({
@@ -415,6 +566,8 @@ function renderDelayedContinueScreen({
   subtext = "",
   buttonLabel,
   onContinue,
+  onEscape = null,
+  showSupportLink = false,
 }) {
   renderMessageScreen({
     label,
@@ -422,7 +575,9 @@ function renderDelayedContinueScreen({
     subtext,
     buttonText: buttonLabel,
     onContinue,
+    onEscape,
     includePulse: true,
+    showSupportLink,
   });
 }
 
@@ -432,6 +587,7 @@ function renderInputScreen({
   subtext = "",
   value,
   onSubmit,
+  onEscape = null,
   placeholder = "",
 }) {
   checkinCard.innerHTML = `
@@ -446,6 +602,7 @@ function renderInputScreen({
         class="text-input"
         placeholder="${escapeAttribute(placeholder)}"
       >${escapeHtml(value)}</textarea>
+      ${renderTooMuchAction(onEscape)}
       <div class="actions">
         <button class="button button-primary" type="submit">Continue →</button>
       </div>
@@ -454,15 +611,47 @@ function renderInputScreen({
 
   const form = document.querySelector("#prompt-form");
   const input = document.querySelector("#response-input");
-  input.focus();
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     onSubmit(input.value);
   });
+
+  bindTooMuchAction(onEscape);
+  safeFocus(input);
 }
 
-function renderBodyLocationScreen({ label, main, subtext = "", selections, note, onSubmit }) {
+function renderChoiceScreen({ label, main, subtext = "", options, onSelect, onEscape = null }) {
+  checkinCard.innerHTML = `
+    <div class="support-copy">
+      <p class="eyebrow">${escapeHtml(label)}</p>
+      <h2>${escapeHtml(main)}</h2>
+      ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
+      ${renderTooMuchAction(onEscape)}
+      <div class="choice-stack">
+        ${options
+          .map(
+            (option) => `
+              <button class="button button-secondary choice-stack-button" type="button" data-choice-value="${escapeAttribute(option.value)}">
+                ${escapeHtml(option.label)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll("[data-choice-value]").forEach((button) => {
+    button.addEventListener("click", () => {
+      onSelect(button.dataset.choiceValue);
+    });
+  });
+
+  bindTooMuchAction(onEscape);
+}
+
+function renderBodyLocationScreen({ label, main, subtext = "", selections, note, onSubmit, onEscape = null }) {
   const chips = [
     "chest",
     "throat",
@@ -471,8 +660,8 @@ function renderBodyLocationScreen({ label, main, subtext = "", selections, note,
     "shoulders",
     "face",
     "hands",
-    "everywhere",
-    "hard to tell",
+    "all over",
+    "not sure",
   ];
 
   checkinCard.innerHTML = `
@@ -501,6 +690,7 @@ function renderBodyLocationScreen({ label, main, subtext = "", selections, note,
         id="body-note-input"
         class="text-input text-input-compact"
       >${escapeHtml(note)}</textarea>
+      ${renderTooMuchAction(onEscape)}
       <div class="actions">
         <button class="button button-primary" type="submit">Continue</button>
       </div>
@@ -527,6 +717,8 @@ function renderBodyLocationScreen({ label, main, subtext = "", selections, note,
       note: document.querySelector("#body-note-input").value,
     });
   });
+
+  bindTooMuchAction(onEscape);
 }
 
 function renderStayScreen({
@@ -542,6 +734,7 @@ function renderStayScreen({
   secondaryButtonText,
   onPrimary,
   onSecondary,
+  onEscape = null,
 }) {
   checkinCard.innerHTML = `
     <form id="stay-form">
@@ -556,6 +749,7 @@ function renderStayScreen({
         id="stay-input"
         class="text-input ${escapeAttribute(inputClassName)}"
       >${escapeHtml(value)}</textarea>
+      ${renderTooMuchAction(onEscape)}
       <div class="choice-group">
         <button class="button button-secondary" type="button" id="stay-secondary">
           ${escapeHtml(secondaryButtonText)}
@@ -569,7 +763,6 @@ function renderStayScreen({
 
   const form = document.querySelector("#stay-form");
   const input = document.querySelector("#stay-input");
-  input.focus();
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -579,142 +772,17 @@ function renderStayScreen({
   document.querySelector("#stay-secondary").addEventListener("click", () => {
     onSecondary(input.value);
   });
+
+  bindTooMuchAction(onEscape);
+  safeFocus(input);
 }
 
-function renderPauseScreen({
-  label,
-  main = "",
-  subtext = "",
-  pauseMessage = "",
-  stayLabel,
-  moreLabel,
-  continueLabel,
-  auxiliaryLinkLabel = "",
-  auxiliaryExpanded = false,
-  auxiliaryValue = "",
-  auxiliaryLabel = "",
-  auxiliaryPlaceholder = "",
-  onToggleAuxiliary = null,
-  onAuxiliaryChange = null,
-  onStay,
-  onMore,
-  onContinue,
-}) {
-  checkinCard.innerHTML = `
-    <div class="support-copy">
-      <p class="eyebrow">${label}</p>
-      ${main ? `<h2>${escapeHtml(main)}</h2>` : ""}
-      ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
-      ${renderPresenceDots()}
-      ${pauseMessage ? `<p class="stillness">${escapeHtml(pauseMessage)}</p>` : ""}
-      ${
-        auxiliaryLinkLabel
-          ? `
-            <div class="optional-note">
-              <button
-                class="inline-link"
-                type="button"
-                id="auxiliary-toggle"
-                aria-expanded="${auxiliaryExpanded ? "true" : "false"}"
-              >
-                ${escapeHtml(auxiliaryLinkLabel)}
-              </button>
-              ${
-                auxiliaryExpanded
-                  ? `
-                    <label class="field-label" for="auxiliary-input">${escapeHtml(auxiliaryLabel)}</label>
-                    <textarea
-                      id="auxiliary-input"
-                      class="text-input text-input-compact"
-                      placeholder="${escapeAttribute(auxiliaryPlaceholder)}"
-                    >${escapeHtml(auxiliaryValue)}</textarea>
-                  `
-                  : ""
-              }
-            </div>
-          `
-          : ""
-      }
-      <div class="choice-group">
-        <button class="button button-secondary" type="button" id="stay-action">
-          ${escapeHtml(stayLabel)}
-        </button>
-        <button class="button button-secondary" type="button" id="more-action">
-          ${escapeHtml(moreLabel)}
-        </button>
-        <button class="button button-primary" type="button" id="continue-action">
-          ${escapeHtml(continueLabel)}
-        </button>
-      </div>
-    </div>
-  `;
-
-  document.querySelector("#stay-action").addEventListener("click", () => {
-    onStay();
-  });
-  document.querySelector("#more-action").addEventListener("click", () => {
-    onMore();
-  });
-  document.querySelector("#continue-action").addEventListener("click", () => {
-    onContinue();
-  });
-
-  const auxiliaryToggle = document.querySelector("#auxiliary-toggle");
-  if (auxiliaryToggle && onToggleAuxiliary) {
-    auxiliaryToggle.addEventListener("click", () => {
-      onToggleAuxiliary();
-    });
-  }
-}
-
-function renderPresenceStep({ screen, main, reveal, buttonLabel, onContinue, delayMs = 2400 }) {
-  if (!state.delayedRevealReady) {
-    scheduleReveal(screen, delayMs);
-  }
-
-  checkinCard.innerHTML = `
-    <div class="support-copy">
-      <p class="eyebrow">CHECK IN</p>
-      <h2>${escapeHtml(main)}</h2>
-      ${renderPresenceDots()}
-      ${
-        state.delayedRevealReady
-          ? `
-            <p class="muted support-line">${escapeHtml(reveal)}</p>
-            <div class="actions">
-              <button class="button button-primary" type="button" id="presence-continue">${escapeHtml(buttonLabel)}</button>
-            </div>
-          `
-          : ""
-      }
-    </div>
-  `;
-
-  if (state.delayedRevealReady) {
-    document.querySelector("#presence-continue").addEventListener("click", onContinue);
-  }
-}
-
-function renderSilentPresenceStep({ screen, main, buttonLabel, onContinue }) {
-  checkinCard.innerHTML = `
-    <div class="support-copy">
-      <p class="eyebrow">CHECK IN</p>
-      <h2>${escapeHtml(main)}</h2>
-      ${renderPresenceDots()}
-      <div class="actions presence-actions">
-        <button class="button button-primary" type="button" id="presence-continue">${escapeHtml(buttonLabel)}</button>
-      </div>
-    </div>
-  `;
-
-  document.querySelector("#presence-continue").addEventListener("click", onContinue);
-}
-
-function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrimary, onSecondary }) {
+function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrimary, onSecondary, onEscape = null }) {
   checkinCard.innerHTML = `
     <div class="support-copy">
       <p class="eyebrow">${escapeHtml(label)}</p>
       <h2>${escapeHtml(main)}</h2>
+      ${renderTooMuchAction(onEscape)}
       <div class="choice-group">
         <button class="button button-secondary" type="button" id="secondary-action">
           ${escapeHtml(secondaryLabel)}
@@ -728,6 +796,7 @@ function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrim
 
   document.querySelector("#secondary-action").addEventListener("click", onSecondary);
   document.querySelector("#primary-action").addEventListener("click", onPrimary);
+  bindTooMuchAction(onEscape);
 }
 
 function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
@@ -746,6 +815,101 @@ function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
   document.querySelector("#finish-button").addEventListener("click", resetFlow);
 }
 
+function renderTooMuchScreen() {
+  checkinCard.innerHTML = `
+    <div class="support-copy">
+      <p class="eyebrow">Pause</p>
+      <h2>I can stop here.</h2>
+      <p class="muted support-line">Slow breath. Nothing else has to happen right now. I can come back to this later — or reach a person if I want one.</p>
+      ${renderPresenceDots()}
+      <div class="choice-stack">
+        <button class="button button-secondary" type="button" id="talk-person-button">
+          I want to talk to a person →
+        </button>
+        <button class="button button-secondary" type="button" id="save-later-button">
+          Save for later →
+        </button>
+        <button class="button button-secondary" type="button" id="return-home-button">
+          Back to start
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.querySelector("#talk-person-button").addEventListener("click", openResources);
+  document.querySelector("#return-home-button").addEventListener("click", resetFlow);
+  document.querySelector("#save-later-button").addEventListener("click", () => {
+    state.entry.wantsReturnLater = true;
+    state.entry.returnLine = "I can come back to this later.";
+    state.entry.closingLine = "I can come back to this later.";
+    finishCheckIn("closing", state.entry.closingLine);
+  });
+}
+
+function renderTooMuchAction(onEscape) {
+  if (!onEscape) {
+    return "";
+  }
+
+  return `
+    <div class="soft-escape">
+      <button class="inline-link soft-escape-button" type="button" id="too-much-action">
+        This is too much
+      </button>
+    </div>
+  `;
+}
+
+function bindTooMuchAction(onEscape) {
+  const escapeButton = document.querySelector("#too-much-action");
+
+  if (escapeButton && onEscape) {
+    escapeButton.addEventListener("click", onEscape);
+  }
+}
+
+function renderInlineSupportLink() {
+  return `
+    <div class="soft-escape">
+      <button class="inline-link soft-escape-button" type="button" id="inline-support-action">
+        If I need a person, support is here →
+      </button>
+    </div>
+  `;
+}
+
+function bindInlineSupportLink() {
+  const link = document.querySelector("#inline-support-action");
+  if (link) {
+    link.addEventListener("click", openResources);
+  }
+}
+
+function renderPresenceDots() {
+  return `<div class="pulse-dot" aria-hidden="true"></div>`;
+}
+
+/* ---------- SUPPORT / RESOURCES OVERLAY ---------- */
+
+function openResources() {
+  if (supportOverlay) {
+    supportOverlay.classList.add("is-open");
+    document.body.classList.add("support-open");
+    if (supportClose) {
+      supportClose.focus();
+    }
+  }
+}
+
+function closeResources() {
+  if (supportOverlay) {
+    supportOverlay.classList.remove("is-open");
+    document.body.classList.remove("support-open");
+  }
+}
+
+/* ---------- SESSION LOG ---------- */
+
 function renderThreads() {
   const entries = getEntriesNewestFirst();
 
@@ -753,6 +917,7 @@ function renderThreads() {
     ${
       entries.length
         ? `
+          <p class="muted support-line session-log-hint">A quiet record I can open and read on my own — or bring into a session.</p>
           <div class="session-log-list">
             ${entries.map(renderSessionLogCard).join("")}
           </div>
@@ -771,6 +936,15 @@ function renderThreads() {
     }
   `;
 
+  document.querySelectorAll("[data-copy-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const entry = entries.find((item) => (item.id || "") === button.dataset.copyId);
+      if (entry) {
+        copySessionText(entry, button);
+      }
+    });
+  });
+
   const clearButton = document.querySelector("#clear-session-log");
   if (clearButton) {
     clearButton.addEventListener("click", () => {
@@ -782,44 +956,164 @@ function renderThreads() {
   }
 }
 
+function renderSessionLogCard(entry) {
+  const bodyLine = (entry.bodyLocations || []).length
+    ? `Body: ${entry.bodyLocations.join(", ")}`
+    : "";
+  const finalLine =
+    entry.returnLine ||
+    entry.goodContinuityReflection ||
+    entry.offContextReflection ||
+    entry.rememberLine ||
+    entry.closingLine ||
+    "";
+  const returnMarker = entry.wantsReturnLater ? "Saved to come back to." : "";
+  const carryMarker = entry.bringToTherapy && entry.bringToTherapyLine
+    ? `For my next session: ${shortenText(entry.bringToTherapyLine, 140)}`
+    : "";
+
+  return `
+    <article class="session-log-card" data-session-id="${escapeAttribute(entry.id || "")}">
+      <p class="eyebrow">${escapeHtml(formatSessionTimestamp(entry.timestamp))}</p>
+      <h3>${escapeHtml(entry.entryTypeLabel || getEntryTypeLabel(entry.entryType))}</h3>
+      <p>${escapeHtml(entry.sessionSummary || buildSessionExcerpt(entry))}</p>
+      ${bodyLine ? `<p class="muted">${escapeHtml(bodyLine)}</p>` : ""}
+      ${returnMarker ? `<p class="muted return-marker">${escapeHtml(returnMarker)}</p>` : ""}
+      ${carryMarker ? `<p class="muted carry-marker">${escapeHtml(carryMarker)}</p>` : ""}
+      ${finalLine ? `<p class="muted">I noticed: ${escapeHtml(shortenText(finalLine, 110))}</p>` : ""}
+      <div class="session-log-card-actions">
+        <button class="inline-link session-log-copy" type="button" data-copy-id="${escapeAttribute(entry.id || "")}">
+          Copy for my session
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function copySessionText(entry, button) {
+  const text = buildSessionCopyText(entry);
+  const restore = () => {
+    button.textContent = "Copy for my session";
+  };
+
+  const succeed = () => {
+    button.textContent = "Copied ✓";
+    window.setTimeout(restore, 1800);
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(succeed).catch(() => fallbackCopy(text, succeed));
+  } else {
+    fallbackCopy(text, succeed);
+  }
+}
+
+function fallbackCopy(text, onDone) {
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "absolute";
+  area.style.left = "-9999px";
+  document.body.appendChild(area);
+  area.select();
+  try {
+    document.execCommand("copy");
+    onDone();
+  } catch (error) {
+    window.prompt("Copy this:", text);
+  }
+  document.body.removeChild(area);
+}
+
+function buildSessionCopyText(entry) {
+  const lines = [];
+  const when = formatSessionTimestamp(entry.timestamp);
+  lines.push(`${entry.entryTypeLabel || getEntryTypeLabel(entry.entryType)}${when ? ` — ${when}` : ""}`);
+
+  if (entry.mainResponse) {
+    lines.push(`What was here: ${entry.mainResponse}`);
+  }
+  if ((entry.bodyLocations || []).length) {
+    lines.push(`In the body: ${entry.bodyLocations.join(", ")}`);
+  }
+  if (entry.bodyNote) {
+    lines.push(`Body note: ${entry.bodyNote}`);
+  }
+  if (entry.deeperReflection) {
+    lines.push(`Underneath: ${entry.deeperReflection}`);
+  }
+  if (entry.spaciousReflection) {
+    lines.push(`Also noticed: ${entry.spaciousReflection}`);
+  }
+  if (entry.perspectiveReflection) {
+    lines.push(`From farther back: ${entry.perspectiveReflection}`);
+  }
+  if (entry.offContextReflection) {
+    lines.push(`Felt connected to: ${entry.offContextReflection}`);
+  }
+  if (entry.rememberLine) {
+    lines.push(`Wanted to remember: ${entry.rememberLine}`);
+  }
+  if (entry.goodContinuityReflection) {
+    lines.push(`Felt this before: ${entry.goodContinuityReflection}`);
+  }
+  if (entry.bringToTherapy && entry.bringToTherapyLine) {
+    lines.push(`To bring to session: ${entry.bringToTherapyLine}`);
+  }
+
+  return lines.join("\n");
+}
+
 function finishCheckIn(closingScreen = "closing", closingLine = "") {
-  const extractedKeywords = extractKeywordsForEntry(state.entry);
-  state.entry.extractedKeywords = extractedKeywords;
-  state.entry.closingAffirmation = "";
   state.entry.closingLine = closingLine || state.promptCopy.offClosing;
-  saveEntry();
+  try {
+    saveEntry();
+  } catch (error) {
+    console.warn("Curious could not finish saving this session.", error);
+  }
   state.screen = closingScreen;
   renderCheckIn();
   renderThreads();
 }
 
-function renderPresenceDots() {
-  return `<div class="pulse-dot" aria-hidden="true"></div>`;
-}
-
-function getPulseDelay() {
-  return 1500 + Math.floor(Math.random() * 1000);
-}
-
 function resetFlow() {
   state.screen = "opening";
-  state.pauseMessage = "";
-  state.delayedRevealReady = false;
   state.promptCopy = createPromptCopy();
   state.entry = createEmptyEntry();
+  checkinCard.classList.toggle("opening-shell", true);
+  updateChromeState();
   renderCheckIn();
 }
 
 function saveEntry() {
   const entries = getEntries();
   entries.push(buildSavedSession());
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  } catch (error) {
+    console.warn("Curious could not save this session.", error);
+  }
 }
 
 function getEntries() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+
+    if (parsed && Array.isArray(parsed.entries)) {
+      return parsed.entries;
+    }
+
+    if (parsed && Array.isArray(parsed.sessions)) {
+      return parsed.sessions;
+    }
+
+    return [];
   } catch (error) {
     return [];
   }
@@ -844,39 +1138,21 @@ function buildSavedSession() {
     mainResponse: state.entry.mainResponse,
     bodyLocations: state.entry.bodyLocations,
     bodyNote: state.entry.bodyNote,
+    intensity: state.entry.intensity,
     deeperReflection: state.entry.deeperReflection,
     spaciousReflection: state.entry.spaciousReflection,
     perspectiveReflection: state.entry.perspectiveReflection,
     offContextReflection: state.entry.offContextReflection,
     continuationReflection: state.entry.continuationReflection,
+    wantsReturnLater: state.entry.wantsReturnLater,
+    returnLine: state.entry.returnLine,
     rememberLine: state.entry.rememberLine,
     goodContinuityReflection: state.entry.goodContinuityReflection,
+    bringToTherapy: state.entry.bringToTherapy,
+    bringToTherapyLine: state.entry.bringToTherapyLine,
     closingLine: state.entry.closingLine,
     sessionSummary: buildSessionExcerpt(state.entry),
-    extractedKeywords: state.entry.extractedKeywords,
   };
-}
-
-function renderSessionLogCard(entry) {
-  const bodyLine = (entry.bodyLocations || []).length
-    ? `Body: ${entry.bodyLocations.join(", ")}`
-    : "";
-  const finalLine =
-    entry.goodContinuityReflection ||
-    entry.offContextReflection ||
-    entry.rememberLine ||
-    entry.closingLine ||
-    "";
-
-  return `
-    <article class="session-log-card" data-session-id="${escapeAttribute(entry.id || "")}">
-      <p class="eyebrow">${escapeHtml(formatSessionTimestamp(entry.timestamp))}</p>
-      <h3>${escapeHtml(entry.entryTypeLabel || getEntryTypeLabel(entry.entryType))}</h3>
-      <p>${escapeHtml(entry.sessionSummary || buildSessionExcerpt(entry))}</p>
-      ${bodyLine ? `<p class="muted">${escapeHtml(bodyLine)}</p>` : ""}
-      ${finalLine ? `<p class="muted">I noticed: ${escapeHtml(shortenText(finalLine, 110))}</p>` : ""}
-    </article>
-  `;
 }
 
 function buildSessionExcerpt(entry) {
@@ -902,12 +1178,12 @@ function getPrimarySessionText(entry) {
   }
 
   return (
+    entry.mainResponse ||
     getLastReflectionChunk(entry.offContextReflection) ||
     getLastReflectionChunk(entry.continuationReflection) ||
     getLastReflectionChunk(entry.spaciousReflection) ||
     getLastReflectionChunk(entry.deeperReflection) ||
     getLastReflectionChunk(entry.perspectiveReflection) ||
-    entry.mainResponse ||
     entry.bodyNote ||
     entry.closingLine ||
     ""
@@ -937,26 +1213,6 @@ function createSessionId() {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function collectEntryTexts(entry) {
-  return [
-    entry.mainResponse || entry.openingReflection || entry.firstReflection,
-    (entry.bodyLocations || []).join(" "),
-    entry.bodyNote,
-    entry.deeperReflection || entry.situationBothering,
-    entry.spaciousReflection,
-    entry.perspectiveReflection || entry.situationPerspective || entry.situationClearer,
-    entry.offContextReflection,
-    entry.continuationReflection,
-    entry.rememberLine,
-    entry.goodContinuityReflection,
-    entry.closingLine,
-  ].filter(Boolean);
-}
-
-function extractKeywordsForEntry(entry) {
-  return [...new Set(normalizeTokens(collectEntryTexts(entry).join(" ")))];
-}
-
 function appendReflection(existing = "", next = "") {
   const trimmedNext = next.trim();
 
@@ -967,18 +1223,6 @@ function appendReflection(existing = "", next = "") {
   return existing ? `${existing}\n\n${trimmedNext}` : trimmedNext;
 }
 
-function getMostRecentOffEntryText(entry) {
-  const values = [
-    getLastReflectionChunk(entry.continuationReflection),
-    getLastReflectionChunk(entry.spaciousReflection),
-    getLastReflectionChunk(entry.perspectiveReflection),
-    entry.deeperReflection,
-    entry.mainResponse,
-  ];
-
-  return values.find((value) => value && value.trim()) || "";
-}
-
 function getLastReflectionChunk(text = "") {
   const chunks = text
     .split(/\n{2,}/)
@@ -986,357 +1230,6 @@ function getLastReflectionChunk(text = "") {
     .filter(Boolean);
 
   return chunks.length ? chunks[chunks.length - 1] : "";
-}
-
-function getQuietReflectionLine(sourceText = "", fallback = "There’s room here.") {
-  const mirrored = buildMirroredPhrase(sourceText);
-  return mirrored || fallback;
-}
-
-function buildMirroredPhrase(text = "") {
-  const trimmed = text.replace(/\s+/g, " ").trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  const clause = extractInitialClause(trimmed);
-  const words = clause.split(/\s+/).filter(Boolean);
-
-  if (words.length < 3) {
-    return "";
-  }
-
-  const limited = words.slice(0, 8).join(" ").replace(/[,:;]+$/g, "");
-  const normalized = limited.charAt(0).toUpperCase() + limited.slice(1);
-  return /[.!?]$/.test(normalized) ? normalized : `${normalized}.`;
-}
-
-function extractInitialClause(text = "") {
-  const breakPatterns = [
-    /\.\s/,
-    /!\s/,
-    /\?\s/,
-    /\n/,
-    /,\s/,
-    /;\s/,
-    /\sand\s/i,
-    /\sbut\s/i,
-    /\sbecause\s/i,
-  ];
-
-  let clause = text;
-
-  for (const pattern of breakPatterns) {
-    const match = clause.match(pattern);
-    if (match && match.index >= 12) {
-      clause = clause.slice(0, match.index);
-      break;
-    }
-  }
-
-  return clause.trim();
-}
-
-function loopCheckIn() {
-  state.entry.loopCount += 1;
-  state.promptCopy = createPromptCopy(state.promptCopy);
-  state.entry.bodyLocations = [];
-  state.entry.bodyNote = "";
-  state.entry.deeperReflection = "";
-  state.entry.spaciousReflection = "";
-  state.entry.perspectiveReflection = "";
-  state.entry.offContextReflection = "";
-  state.entry.continuationReflection = "";
-  state.entry.goodContinuityReflection = "";
-  state.entry.stayLoopCount = 0;
-  if (state.entry.loopCount % 2 === 1) {
-    setScreen("off-body");
-    return;
-  }
-
-  state.entry.mainResponse = "";
-  setScreen("off-main");
-}
-
-function buildCalendar(entries, referenceDate) {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const marks = getEntryCountByDay(entries, year, month);
-  const days = [];
-
-  for (let i = 0; i < firstDay.getDay(); i += 1) {
-    days.push({ empty: true, key: `empty-start-${i}` });
-  }
-
-  for (let dayNumber = 1; dayNumber <= lastDay.getDate(); dayNumber += 1) {
-    const dayInfo = marks.get(dayNumber) || { count: 0, markerType: "" };
-    const dateKey = formatDateKey(year, month, dayNumber);
-    days.push({
-      empty: false,
-      key: `day-${dayNumber}`,
-      label: String(dayNumber),
-      dateKey,
-      count: dayInfo.count,
-      markerType: dayInfo.markerType,
-      marked: dayInfo.count > 0,
-      selected: state.selectedPatternDate === dateKey,
-      isToday:
-        dayNumber === referenceDate.getDate() &&
-        month === new Date().getMonth() &&
-        year === new Date().getFullYear(),
-    });
-  }
-
-  while (days.length % 7 !== 0) {
-    days.push({ empty: true, key: `empty-end-${days.length}` });
-  }
-
-  return {
-    monthLabel: referenceDate.toLocaleDateString(undefined, {
-      month: "long",
-      year: "numeric",
-    }),
-    weekdays: CALENDAR_WEEKDAYS,
-    days,
-  };
-}
-
-function renderCalendarDay(day) {
-  if (day.empty) {
-    return `<div class="calendar-day calendar-day-empty" aria-hidden="true"></div>`;
-  }
-
-  return `
-    <button
-      class="calendar-day-button${day.marked ? " is-marked" : ""}${day.selected ? " is-selected" : ""}${day.isToday ? " is-today" : ""}${day.markerType ? ` is-${day.markerType}` : ""}"
-      type="button"
-      data-pattern-date="${escapeAttribute(day.dateKey)}"
-      aria-label="${escapeAttribute(buildCalendarDayLabel(day))}"
-    >
-      <span class="calendar-day-label">${escapeHtml(day.label)}</span>
-      <span class="calendar-day-dot" aria-hidden="true"></span>
-    </button>
-  `;
-}
-
-function buildCalendarDayLabel(day) {
-  if (!day.marked) {
-    return `${day.label}`;
-  }
-
-  if (day.count === 1) {
-    return `${day.label}, one check-in`;
-  }
-
-  return `${day.label}, ${day.count} check-ins`;
-}
-
-function getEntryCountByDay(entries, year, month) {
-  const counts = new Map();
-
-  entries.forEach((entry) => {
-    if (!entry.timestamp) {
-      return;
-    }
-
-    const date = new Date(entry.timestamp);
-
-    if (Number.isNaN(date.getTime())) {
-      return;
-    }
-
-    if (date.getFullYear() !== year || date.getMonth() !== month) {
-      return;
-    }
-
-    const day = date.getDate();
-    const current = counts.get(day) || { count: 0, types: new Set() };
-    current.count += 1;
-    current.types.add(entry.entryType || "off");
-    counts.set(day, current);
-  });
-
-  return new Map(
-    [...counts.entries()].map(([day, info]) => {
-      const markerType =
-        info.types.size > 1 ? "mixed" : info.types.has("good") ? "good" : "off";
-      return [day, { count: info.count, markerType }];
-    })
-  );
-}
-
-function resolveSelectedPatternDate(entries, calendar) {
-  if (state.selectedPatternDate && calendar.days.some((day) => !day.empty && day.dateKey === state.selectedPatternDate)) {
-    return state.selectedPatternDate;
-  }
-
-  const firstMarkedDay = calendar.days.find((day) => !day.empty && day.marked);
-  const fallbackDay = calendar.days.find((day) => !day.empty && day.isToday) || calendar.days.find((day) => !day.empty);
-  const selected = (firstMarkedDay || fallbackDay)?.dateKey || "";
-  state.selectedPatternDate = selected;
-  return selected;
-}
-
-function getEntriesForDate(entries, dateKey) {
-  return entries.filter((entry) => entry.timestamp && toDateKey(new Date(entry.timestamp)) === dateKey);
-}
-
-function renderPatternDayCard(selectedDate, entries) {
-  if (!selectedDate) {
-    return `
-      <div class="pattern-day-card">
-        <h3>Nothing saved here.</h3>
-        <p class="muted">That doesn’t mean nothing was happening. There just isn’t a note from this day.</p>
-      </div>
-    `;
-  }
-
-  const dayLabel = formatReadableDate(selectedDate);
-
-  if (!entries.length) {
-    return `
-      <div class="pattern-day-card">
-        <p class="eyebrow">${escapeHtml(dayLabel)}</p>
-        <h3>Nothing saved here.</h3>
-        <p class="muted">That doesn’t mean nothing was happening. There just isn’t a note from this day.</p>
-      </div>
-    `;
-  }
-
-  const summary = buildDaySummary(entries, selectedDate);
-
-  return `
-    <div class="pattern-day-card">
-      <p class="eyebrow">${escapeHtml(dayLabel)}</p>
-      <h3>${escapeHtml(summary.entryTypeLabel)}</h3>
-      <div class="pattern-day-sections">
-        <div class="pattern-day-section">
-          <p>${escapeHtml(summary.mainResponse)}</p>
-        </div>
-        ${
-          summary.bodyLine
-            ? `
-              <div class="pattern-day-section">
-                <p class="muted">I noticed this in ${escapeHtml(summary.bodyLine)}.</p>
-              </div>
-            `
-            : ""
-        }
-        ${
-          summary.noticedLine
-            ? `
-              <div class="pattern-day-section">
-                <p class="muted">I noticed: ${escapeHtml(summary.noticedLine)}</p>
-              </div>
-            `
-            : ""
-        }
-      </div>
-    </div>
-  `;
-}
-
-function buildDaySummary(entries, selectedDate) {
-  const latestEntry = entries[0];
-  const bodyBits = (latestEntry.bodyLocations || []).filter(Boolean);
-  const noticedLine = getPatternNoticedLine(latestEntry);
-
-  return {
-    entryTypeLabel: latestEntry.entryType === "good" ? "Something felt good" : "Something felt off",
-    mainResponse: shortenText(latestEntry.mainResponse || "There wasn’t much written here, and that still counts."),
-    bodyLine: bodyBits.length ? shortenText(bodyBits.join(", "), 80) : "",
-    noticedLine,
-  };
-}
-
-function buildInnerPatternLines(entries, selectedEntries) {
-  if (entries.length < 3) {
-    return ["Patterns will appear gently as more check-ins are saved."];
-  }
-
-  const bodyCounts = getBodyLocationCounts(entries);
-  const repeatedBody = [...bodyCounts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const hasOlderLanguage = entries.some((entry) =>
-    [entry.deeperReflection, entry.spaciousReflection, entry.continuationReflection]
-      .filter(Boolean)
-      .some((text) => /\b(older|old|familiar)\b/i.test(text))
-  );
-  const hasGood = entries.some((entry) => entry.entryType === "good");
-  const hasOff = entries.some((entry) => (entry.entryType || "off") === "off");
-  const repeatedWords = getRepeatedKeywords(entries, 2);
-  const lines = [];
-
-  if (repeatedBody && repeatedBody[1] > 1) {
-    lines.push(`${capitalize(repeatedBody[0])} has come up more than once.`);
-  }
-
-  if (hasOlderLanguage) {
-    lines.push("Older or familiar has shown up recently.");
-  }
-
-  if (hasGood && hasOff) {
-    lines.push("Good moments are being recorded too.");
-  }
-
-  if (!lines.length && selectedEntries.length && repeatedWords[0]) {
-    lines.push("This feeling has visited before.");
-  }
-
-  if (!lines.length && repeatedWords[0]) {
-    lines.push("Something here has come around before.");
-  }
-
-  return lines.length ? lines.slice(0, 3) : ["Patterns will appear gently as more check-ins are saved."];
-}
-
-function getPatternNoticedLine(entry) {
-  const value =
-    getLastReflectionChunk(entry.rememberLine) ||
-    getLastReflectionChunk(entry.perspectiveReflection) ||
-    getLastReflectionChunk(entry.continuationReflection) ||
-    getLastReflectionChunk(entry.spaciousReflection) ||
-    getLastReflectionChunk(entry.deeperReflection) ||
-    "";
-
-  return value ? shortenText(value, 100) : "";
-}
-
-function getBodyLocationCounts(entries) {
-  const counts = new Map();
-
-  entries.forEach((entry) => {
-    (entry.bodyLocations || []).forEach((location) => {
-      const normalized = location.trim().toLowerCase();
-      if (!normalized) {
-        return;
-      }
-
-      counts.set(normalized, (counts.get(normalized) || 0) + 1);
-    });
-  });
-
-  return counts;
-}
-
-function formatDateKey(year, month, day) {
-  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function toDateKey(date) {
-  return formatDateKey(date.getFullYear(), date.getMonth(), date.getDate());
-}
-
-function formatReadableDate(dateKey) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  return date.toLocaleDateString(undefined, {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function shortenText(text = "", limit = 90) {
@@ -1349,159 +1242,15 @@ function shortenText(text = "", limit = 90) {
   return `${trimmed.slice(0, limit).trimEnd()}...`;
 }
 
-function hashString(value = "") {
-  let hash = 0;
-
-  for (const char of value) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+function safeFocus(element) {
+  if (!element) {
+    return;
   }
-
-  return hash;
-}
-
-function getTopTerms(values, limit) {
-  const counts = new Map();
-
-  values
-    .flatMap((value) => normalizeTokens(value))
-    .forEach((token) => {
-      counts.set(token, (counts.get(token) || 0) + 1);
-    });
-
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([term]) => term);
-}
-
-function getRepeatedKeywords(entries, limit) {
-  const counts = new Map();
-
-  entries.forEach((entry) => {
-    const tokens = new Set([
-      ...(entry.extractedKeywords || []),
-      ...normalizeTokens(collectEntryTexts(entry).join(" ")),
-    ]);
-
-    tokens.forEach((token) => {
-      counts.set(token, (counts.get(token) || 0) + 1);
-    });
-  });
-
-  return [...counts.entries()]
-    .filter(([, count]) => count > 1)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([term]) => term);
-}
-
-function scheduleReveal(screen, delayMs = 2400) {
-  window.setTimeout(() => {
-    if (state.screen !== screen || state.delayedRevealReady) {
-      return;
-    }
-
-    state.delayedRevealReady = true;
-    renderCheckIn();
-  }, delayMs);
-}
-
-function normalizeTokens(text = "") {
-  const stopWords = new Set([
-    "and",
-    "the",
-    "that",
-    "this",
-    "with",
-    "from",
-    "have",
-    "been",
-    "just",
-    "into",
-    "there",
-    "they",
-    "them",
-    "about",
-    "what",
-    "feel",
-    "feels",
-    "feeling",
-    "here",
-    "right",
-    "want",
-    "hear",
-    "stay",
-    "self",
-    "after",
-    "more",
-    "little",
-    "really",
-    "still",
-    "very",
-    "like",
-    "know",
-    "need",
-    "will",
-    "could",
-    "would",
-    "should",
-    "while",
-    "where",
-    "when",
-    "because",
-    "then",
-    "than",
-    "thing",
-    "things",
-    "part",
-    "listening",
-    "true",
-    "think",
-    "through",
-    "steady",
-    "most",
-    "actually",
-    "clearer",
-    "start",
-    "anywhere",
-    "stands",
-    "standsout",
-    "fits",
-    "best",
-    "my",
-    "our",
-    "me",
-    "can",
-    "now",
-    "got",
-    "am",
-    "are",
-    "too",
-    "i",
-    "im",
-    "you",
-    "your",
-    "why",
-  ]);
-
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter((word) => word.length > 2 && !stopWords.has(word));
-}
-
-function formatList(items) {
-  if (!items.length) {
-    return "";
+  try {
+    element.focus({ preventScroll: true });
+  } catch (error) {
+    /* Some sandboxed/preview frames disallow programmatic focus; ignore. */
   }
-
-  return items.map(capitalize).join(", ");
-}
-
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function escapeHtml(text = "") {

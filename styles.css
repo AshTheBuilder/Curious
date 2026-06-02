@@ -52,9 +52,10 @@ button {
 }
 
 .app-header {
-  padding: 44px 4px 42px;
+  padding: 8px 4px 28px;
   text-align: center;
   animation: fadeUp 760ms ease both;
+  overflow: visible;
 }
 
 .brand-lockup {
@@ -62,12 +63,13 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 0;
+  overflow: visible;
 }
 
 .brand-arch {
-  width: 210px;
-  max-width: 62vw;
-  margin-bottom: 22px;
+  width: 286px;
+  max-width: 78vw;
+  transform: translateY(96px);
   opacity: 0.98;
 }
 
@@ -93,6 +95,7 @@ p {
 }
 
 .brand-title {
+  margin-top: 0;
   margin-bottom: 0;
   font-family: "Playfair Display", Georgia, serif;
   font-size: clamp(3.55rem, 11vw, 6.1rem);
@@ -147,6 +150,31 @@ h3 {
   height: 1px;
   margin-top: 36px;
   background: rgba(232, 226, 217, 0.32);
+}
+
+body.is-compact-brand .app-header {
+  padding: 0 4px 14px;
+}
+
+body.is-compact-brand .brand-arch {
+  width: 136px;
+  max-width: 42vw;
+  transform: translateY(44px);
+}
+
+body.is-compact-brand .brand-title {
+  font-size: clamp(1.8rem, 5vw, 2.7rem);
+  letter-spacing: 0.1em;
+}
+
+body.is-compact-brand .tagline {
+  margin-top: 10px;
+  font-size: 0.8rem;
+}
+
+body.is-compact-brand .brand-divider {
+  margin-top: 12px;
+  width: 26px;
 }
 
 .eyebrow {
@@ -386,8 +414,16 @@ h3 {
   font-style: italic;
   letter-spacing: 0.03em;
   text-transform: none;
-  border-color: rgba(201, 185, 154, 0.12);
-  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(201, 185, 154, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: none;
+}
+
+.home-entry-button:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(201, 185, 154, 0.2);
+  color: var(--accent-hover);
 }
 
 .chip-group {
@@ -429,6 +465,25 @@ h3 {
 
 .optional-note {
   margin-top: 20px;
+}
+
+.soft-escape {
+  margin-top: 18px;
+}
+
+.soft-escape-button {
+  color: rgba(122, 115, 104, 0.86);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.soft-escape-button:hover {
+  color: var(--accent-primary);
+}
+
+.return-marker {
+  color: rgba(201, 185, 154, 0.76);
 }
 
 .stay-heading-quiet {
@@ -567,4 +622,134 @@ h3 {
     width: auto;
     flex: 1 1 0;
   }
+}
+
+/* ---------- Added: titration choices, footer, support overlay, log bridge ---------- */
+
+.choice-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.choice-stack-button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  min-height: 56px;
+}
+
+.app-footer {
+  margin-top: 40px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(201, 185, 154, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.footer-note {
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: rgba(122, 115, 104, 0.86);
+}
+
+.footer-support {
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.session-log-hint {
+  margin: 0 0 18px;
+  font-size: 0.96rem;
+}
+
+.session-log-card-actions {
+  margin-top: 6px;
+}
+
+.session-log-copy {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.carry-marker {
+  color: rgba(201, 185, 154, 0.82);
+}
+
+/* Support overlay */
+.support-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(8, 8, 8, 0.74);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+}
+
+.support-overlay.is-open {
+  display: flex;
+  animation: fadeInSoft 280ms ease;
+}
+
+body.support-open {
+  overflow: hidden;
+}
+
+.support-dialog {
+  width: min(100%, 460px);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 30px 26px 26px;
+  border-radius: var(--radius-xl);
+  background: #131313;
+  border: 1px solid var(--accent-border-strong);
+  box-shadow: var(--shadow);
+}
+
+.support-list {
+  list-style: none;
+  margin: 22px 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.support-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.support-resource {
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.12rem;
+  letter-spacing: 0.02em;
+  color: var(--accent-hover);
+  text-decoration: none;
+  width: fit-content;
+  border-bottom: 1px solid rgba(201, 185, 154, 0.24);
+  padding-bottom: 1px;
+}
+
+.support-resource:hover {
+  color: #efe7de;
+  border-color: rgba(201, 185, 154, 0.5);
+}
+
+.support-resource-note {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
