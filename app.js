@@ -140,24 +140,24 @@ function renderCheckIn() {
       break;
     case "off-intro":
       renderMessageScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "Something feels off",
-        buttonText: "Let me pause for a second",
+        buttonText: "I’m curious →",
         onContinue: () => setScreen("off-main"),
       });
       break;
     case "good-intro":
       renderMessageScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "Something feels good",
-        buttonText: "Let me stay with that",
+        buttonText: "Stay here →",
         onContinue: () => setScreen("good-main"),
       });
       break;
     case "off-main":
       renderInputScreen({
-        label: "CHECK IN",
-        main: "What’s going on?",
+        label: "Notice",
+        main: "What’s here?",
         value: state.entry.mainResponse,
         onSubmit: (value) => {
           state.entry.mainResponse = value.trim();
@@ -167,7 +167,7 @@ function renderCheckIn() {
       break;
     case "off-body":
       renderBodyLocationScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "Where do I notice this most?",
         subtext: "No need to explain it yet. Just notice where it shows up.",
         selections: state.entry.bodyLocations,
@@ -181,7 +181,7 @@ function renderCheckIn() {
       break;
     case "off-deeper":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Listen",
         main: state.promptCopy.offDeeperPrompt,
         value: "",
         onSubmit: (value) => {
@@ -212,15 +212,15 @@ function renderCheckIn() {
       break;
     case "off-grounding":
       renderDelayedContinueScreen({
-        label: "CHECK IN",
+        label: "Stay Here",
         main: state.promptCopy.offGrounding,
-        buttonLabel: "Keep going",
+        buttonLabel: "Continue →",
         onContinue: () => setScreen("off-perspective"),
       });
       break;
     case "off-perspective":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Widen",
         main: state.promptCopy.offPerspectivePrompt,
         value: "",
         onSubmit: (value) => {
@@ -231,10 +231,10 @@ function renderCheckIn() {
       break;
     case "off-continuation":
       renderLandingScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "Where am I now with this?",
-        primaryLabel: "This feels clearer",
-        secondaryLabel: "There’s more",
+        primaryLabel: "Continue →",
+        secondaryLabel: "Stay here →",
         onPrimary: () => {
           state.entry.closingLine = state.promptCopy.offClosing;
           setScreen("off-connected");
@@ -244,7 +244,7 @@ function renderCheckIn() {
       break;
     case "off-connected":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Tell Me More",
         main: "What feels connected to this?",
         value: "",
         onSubmit: (value) => {
@@ -288,7 +288,7 @@ function renderCheckIn() {
       break;
     case "good-main":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "What feels good right now?",
         value: state.entry.mainResponse,
         onSubmit: (value) => {
@@ -299,15 +299,15 @@ function renderCheckIn() {
       break;
     case "good-validation":
       renderDelayedContinueScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: state.promptCopy.goodValidation,
-        buttonLabel: "Keep going",
+        buttonLabel: "Continue →",
         onContinue: () => setScreen("good-body"),
       });
       break;
     case "good-body":
       renderBodyLocationScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "Where do I notice this in me?",
         selections: state.entry.bodyLocations,
         note: state.entry.bodyNote,
@@ -320,7 +320,7 @@ function renderCheckIn() {
       break;
     case "good-remember":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Save This",
         main: "What do I want to remember about this?",
         value: state.entry.rememberLine,
         onSubmit: (value) => {
@@ -331,7 +331,7 @@ function renderCheckIn() {
       break;
     case "good-continuity":
       renderInputScreen({
-        label: "CHECK IN",
+        label: "Notice",
         main: "When else have I felt this way?",
         subtext: "This version of me has existed before.",
         value: "",
@@ -357,14 +357,14 @@ function setScreen(screen) {
   state.screen = screen;
   state.pauseMessage = "";
   state.delayedRevealReady = false;
+  checkinCard.classList.toggle("opening-shell", screen === "opening");
   renderCheckIn();
 }
 
 function renderOpeningScreen() {
   checkinCard.innerHTML = `
     <div class="opening-screen">
-      <p class="muted support-line">I want to check in.</p>
-      <div class="choice-group home-choice-group">
+      <div class="home-choice-group">
         <button class="button button-secondary home-entry-button" type="button" id="off-begin-button">
           Something feels off
         </button>
@@ -447,7 +447,7 @@ function renderInputScreen({
         placeholder="${escapeAttribute(placeholder)}"
       >${escapeHtml(value)}</textarea>
       <div class="actions">
-        <button class="button button-primary" type="submit">Continue</button>
+        <button class="button button-primary" type="submit">Continue →</button>
       </div>
     </form>
   `;
@@ -733,12 +733,12 @@ function renderLandingScreen({ label, main, primaryLabel, secondaryLabel, onPrim
 function renderClosing({ main, subtext = "", buttonText = "Finish" }) {
   checkinCard.innerHTML = `
     <div class="closing-copy">
-      <p class="eyebrow">CHECK IN</p>
+      <p class="eyebrow">Closing</p>
       <h2>${escapeHtml(main)}</h2>
       ${subtext ? `<p class="muted support-line">${escapeHtml(subtext)}</p>` : ""}
       ${renderPresenceDots()}
       <div class="actions">
-        <button class="button button-primary" type="button" id="finish-button">${escapeHtml(buttonText)}</button>
+        <button class="button button-primary" type="button" id="finish-button">${escapeHtml(buttonText)} →</button>
       </div>
     </div>
   `;
@@ -861,9 +861,6 @@ function renderSessionLogCard(entry) {
   const bodyLine = (entry.bodyLocations || []).length
     ? `Body: ${entry.bodyLocations.join(", ")}`
     : "";
-  const tagsLine = (entry.contextTags || []).length
-    ? `Tags: ${entry.contextTags.join(", ")}`
-    : "";
   const finalLine =
     entry.goodContinuityReflection ||
     entry.offContextReflection ||
@@ -877,7 +874,6 @@ function renderSessionLogCard(entry) {
       <h3>${escapeHtml(entry.entryTypeLabel || getEntryTypeLabel(entry.entryType))}</h3>
       <p>${escapeHtml(entry.sessionSummary || buildSessionExcerpt(entry))}</p>
       ${bodyLine ? `<p class="muted">${escapeHtml(bodyLine)}</p>` : ""}
-      ${tagsLine ? `<p class="muted">${escapeHtml(tagsLine)}</p>` : ""}
       ${finalLine ? `<p class="muted">I noticed: ${escapeHtml(shortenText(finalLine, 110))}</p>` : ""}
     </article>
   `;
